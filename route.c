@@ -6,7 +6,13 @@
 #include <sys/types.h>
 #include <ifaddrs.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <net/if.h>
 #include <string.h>
+#include <netinet/ether.h>
+#include <netinet/ip.h>
+#include <netinet/if_ether.h>
+
 
 int main(){
   int packet_socket;
@@ -81,7 +87,7 @@ int main(){
     printf("Got a %d byte packet\n", n);
       struct ether_header eh;
       memcpy(&eh, buf, 14);
-      printf("Destination: %d\nSource: %d\nType: %d\n",
+      printf("Destination: %s\nSource: %s\nType: %s\n",
              ether_ntoa((struct ether_addr* ) &eh.ether_dhost), ether_ntoa((struct ether_addr* ) &eh.ether_shost), ether_ntoa((struct ether_addr* ) &eh.ether_type));
       if(ntohs(eh.ether_type) == 0x0806) {
           printf("IPv4 Packet\n");
@@ -93,9 +99,9 @@ int main(){
           ina.s_addr = iph.daddr;
           printf("Destination : %s\n", inet_ntoa(ina));
 
-          struct arp_header arp;
+          struct ether_arp arp;
           memcpy(&arp, &buf[34], sizeof(arp));
-          printf("Source Mac : %s\nSource IP : %s\nDestination Mac : %s\nDestination IP :%s", arp.ar_sha, arp.ar_sip, arp.ar_tha, arp.ar_tip);
+          printf("Source Mac : %s\nSource IP : %s\nDestination Mac : %s\nDestination IP :%s", arp.arp_sha, arp.arp_spa, arp.arp_tha, arp.arp_tpa);
       }
     
     //what else to do is up to you, you can send packets with send,
