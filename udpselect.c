@@ -38,7 +38,5 @@ int main(int argc, char **argv){
       fgets(buf,5000,stdin);
       printf("You typed %s\n",buf);
     }
-    
-
   }
 }
