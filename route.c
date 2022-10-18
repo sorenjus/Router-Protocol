@@ -79,6 +79,24 @@ int main(){
       continue;
     //start processing all others
     printf("Got a %d byte packet\n", n);
+      struct ether_header eh;
+      memcpy(&eh, buf, 14);
+      printf("Destination: %d\nSource: %d\nType: %d\n",
+             ether_ntoa((struct ether_addr* ) &eh.ether_dhost), ether_ntoa((struct ether_addr* ) &eh.ether_shost), ether_ntoa((struct ether_addr* ) &eh.ether_type));
+      if(ntohs(eh.ether_type) == 0x0806) {
+          printf("IPv4 Packet\n");
+          struct iphdr iph;
+          struct in_addr ina;
+          memcpy(&iph, &buf[14], sizeof(iph));
+          ina.s_addr = iph.saddr;
+          printf("Source : %s\n", inet_ntoa(ina));
+          ina.s_addr = iph.daddr;
+          printf("Destination : %s\n", inet_ntoa(ina));
+
+          struct arp_header arp;
+          memcpy(&arp, &buf[34], sizeof(arp));
+          printf("Source Mac : %s\nSource IP : %s\nDestination Mac : %s\nDestination IP :%s", arp.ar_sha, arp.ar_sip, arp.ar_tha, arp.ar_tip);
+      }
     
     //what else to do is up to you, you can send packets with send,
     //just like we used for TCP sockets (or you can use sendto, but it
