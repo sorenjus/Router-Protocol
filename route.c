@@ -99,7 +99,7 @@ int main(){
           printf("Source : %s\n", inet_ntoa(ina));
           ina.s_addr = iph.daddr;
           printf("Destination : %s\n", inet_ntoa(ina));
-*/
+          */
           struct ether_arp arpReceived;
           memcpy(&arpReceived, &buf[14], sizeof(arpReceived));
           printf("Source Mac : %s\nSource IP : %s\nDestination Mac : %s\nDestination IP :%s", arpReceived.arp_sha, arpReceived.arp_spa, arpReceived.arp_tha, arpReceived.arp_tpa);
