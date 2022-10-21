@@ -2,12 +2,12 @@
 #include <netpacket/packet.h> 
 #include <net/ethernet.h>
 #include <stdio.h>
-#include <errno.h>
-#include <sys/types.h>
+//#include <errno.h>
+//#include <sys/types.h>
 #include <ifaddrs.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
-#include <net/if.h>
+//#include <net/if.h>
 #include <string.h>
 #include <netinet/ether.h>
 #include <netinet/ip.h>
@@ -91,7 +91,7 @@ int main(){
              ether_ntoa((struct ether_addr* ) &eh.ether_dhost), ether_ntoa((struct ether_addr* ) &eh.ether_shost), ether_ntoa((struct ether_addr* ) &eh.ether_type));
       //when an ARP request is processed, respond
       if(ntohs(eh.ether_type) == 0x0806) {
-          printf("IPv4 Packet\n");
+          /*printf("IPv4 Packet\n");
           struct iphdr iph;
           struct in_addr ina;
           memcpy(&iph, &buf[14], sizeof(iph));
@@ -99,9 +99,9 @@ int main(){
           printf("Source : %s\n", inet_ntoa(ina));
           ina.s_addr = iph.daddr;
           printf("Destination : %s\n", inet_ntoa(ina));
-
+*/
           struct ether_arp arpReceived;
-          memcpy(&arpReceived, &buf[34], sizeof(arpReceived));
+          memcpy(&arpReceived, &buf[14], sizeof(arpReceived));
           printf("Source Mac : %s\nSource IP : %s\nDestination Mac : %s\nDestination IP :%s", arpReceived.arp_sha, arpReceived.arp_spa, arpReceived.arp_tha, arpReceived.arp_tpa);
 
           struct ether_arp arpResponse;
@@ -111,9 +111,12 @@ int main(){
           memcpy(arpResponse.arp_spa, arpReceived.arp_tpa, sizeof(arpReceived.arp_tpa));
           memcpy(arpResponse.arp_sha,ifaddr->ifa_name, sizeof(arpReceived.arp_sha));
 
-          memcpy(&buf, &iph, sizeof(iph));
-          memcpy(&buf[34], &arpResponse, sizeof(arpResponse));
-
+          memcpy(&buf[14], &arpResponse, sizeof(arpResponse));
+          struct ether_header ehResponse;
+          memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_dhost));
+          memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
+          memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
+          memcpy(&buf, &ehResponse, sizeof(ehResponse));
           sendto(packet_socket, buf, 1500, 0,
                  (struct sockaddr *)&arpReceived.arp_spa, sizeof(arpReceived.arp_spa));
       }
