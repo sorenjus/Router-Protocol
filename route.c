@@ -89,6 +89,7 @@ int main(){
       memcpy(&eh, buf, 14);
       printf("Destination: %s\nSource: %s\nType: %s\n",
              ether_ntoa((struct ether_addr* ) &eh.ether_dhost), ether_ntoa((struct ether_addr* ) &eh.ether_shost), ether_ntoa((struct ether_addr* ) &eh.ether_type));
+      //when an ARP request is processed, respond
       if(ntohs(eh.ether_type) == 0x0806) {
           printf("IPv4 Packet\n");
           struct iphdr iph;
@@ -99,9 +100,22 @@ int main(){
           ina.s_addr = iph.daddr;
           printf("Destination : %s\n", inet_ntoa(ina));
 
-          struct ether_arp arp;
-          memcpy(&arp, &buf[34], sizeof(arp));
-          printf("Source Mac : %s\nSource IP : %s\nDestination Mac : %s\nDestination IP :%s", arp.arp_sha, arp.arp_spa, arp.arp_tha, arp.arp_tpa);
+          struct ether_arp arpReceived;
+          memcpy(&arpReceived, &buf[34], sizeof(arpReceived));
+          printf("Source Mac : %s\nSource IP : %s\nDestination Mac : %s\nDestination IP :%s", arpReceived.arp_sha, arpReceived.arp_spa, arpReceived.arp_tha, arpReceived.arp_tpa);
+
+          struct ether_arp arpResponse;
+          //create ARP packet to the request with previous information and host MAC address
+          memcpy(arpResponse.arp_tha, arpReceived.arp_sha, sizeof(arpReceived.arp_sha));
+          memcpy(arpResponse.arp_tpa, arpReceived.arp_spa, sizeof(arpReceived.arp_spa));
+          memcpy(arpResponse.arp_spa, arpReceived.arp_tpa, sizeof(arpReceived.arp_tpa));
+          memcpy(arpResponse.arp_sha,ifaddr->ifa_name, sizeof(arpReceived.arp_sha));
+
+          memcpy(&buf, &iph, sizeof(iph));
+          memcpy(&buf[34], &arpResponse, sizeof(ether_aton));
+
+          sendto(packet_socket, buf, 1500, 0,
+                 (struct sockaddr *)&arpReceived.arp_spa, sizeof(arpReceived.arp_spa));
       }
     
     //what else to do is up to you, you can send packets with send,
