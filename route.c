@@ -94,11 +94,11 @@ int main()
     printf("Got a %d byte packet\n", n);
     struct ether_header eh;
     memcpy(&eh, buf, 14);
-    printf("Destination: %s\nSource: %s\nType: %s\n",
-           ether_ntoa((struct ether_addr *)&eh.ether_dhost), ether_ntoa((struct ether_addr *)&eh.ether_shost), ether_ntoa((struct ether_addr *)&eh.ether_type));
     // when an ARP request is processed, respond
     if (ntohs(eh.ether_type) == 0x0806)
     {
+      printf("Destination: %s\nSource: %s\nType: %s\n",
+             ether_ntoa((struct ether_addr *)&eh.ether_dhost), ether_ntoa((struct ether_addr *)&eh.ether_shost), ether_ntoa((struct ether_addr *)&eh.ether_type));
       /*printf("IPv4 Packet\n");
       struct iphdr iph;
       struct in_addr ina;
@@ -133,14 +133,40 @@ int main()
       memcpy(arpResponse.arp_spa, arpReceived.arp_tpa, sizeof(arpReceived.arp_tpa));
       memcpy(arpResponse.arp_sha, ifaddr->ifa_name, sizeof(arpReceived.arp_sha));
 
+      memcpy(&ina.s_addr, arpResponse.arp_sha, sizeof(arpReceived.arp_sha));
+      printf("Response Source MAC: %s\n", inet_ntoa(ina));
+      // ina.s_addr = arpReceived.arp_tha;
+      memcpy(&ina.s_addr, arpResponse.arp_tha, sizeof(arpReceived.arp_tha));
+      printf("Response Destination MAC: %s\n", inet_ntoa(ina));
+      // ina.s_addr = arpReceived.arp_spa;
+      memcpy(&ina.s_addr, arpResponse.arp_spa, sizeof(arpReceived.arp_spa));
+      printf("Response Source IP: %s\n", inet_ntoa(ina));
+      // ina.s_addr = arpReceived.arp_tpa;
+      memcpy(&ina.s_addr, arpResponse.arp_tpa, sizeof(arpReceived.arp_tpa));
+      printf("Response Destination IP: %s\n", inet_ntoa(ina));
+
       memcpy(&temp_buf[14], &arpResponse, sizeof(arpResponse));
       struct ether_header ehResponse;
-      memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_dhost));
-      memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
-      memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
-      memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
-      sendto(packet_socket, temp_buf, 1500, 0,
-             (struct sockaddr *)&arpReceived.arp_spa, sizeof(arpReceived.arp_spa));
+
+      memcpy(ehResponse.ether_dhost, arpResponse.arp_tha, sizeof(arpResponse.arp_tha));
+      memcpy(ehResponse.ether_shost, arpResponse.arp_sha, sizeof(arpResponse.arp_sha));
+      ehResponse.ether_type == 0x0806;
+      // memcpy(&ina.s_addr, eh.ether_dhost, sizeof(eh.ether_dhost));
+      // memcpy(ehResponse.ether_dhost, ina.s_addr, sizeof(eh.ether_dhost));
+      // memcpy(&ina.s_addr, eh.ether_shost, sizeof(eh.ether_shost));
+      // memcpy(ehResponse.ether_shost, ina.s_addr, sizeof(eh.ether_dhost));
+      // memcpy(&ina.s_addr, eh.ether_type, sizeof(eh.ether_type));
+      // memcpy(&ehResponse.ether_type, ina.s_addr, sizeof(eh.ether_type));
+
+      // memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
+      // sendto(packet_socket, temp_buf, 1500, 0,
+      //        (struct sockaddr *)&recvaddr, sizeof(recvaddr));
+      // memcpy(&ina.s_addr, ehResponse.ether_dhost, sizeof(ehResponse.ether_dhost));
+      // printf("Ether Destination IP: %s\n", inet_ntoa(ina));
+      // memcpy(&ina.s_addr, eh.ether_dhost, sizeof(eh.ether_dhost));
+      // printf("Ether Original Destination IP: %s\n", inet_ntoa(ina));
+      printf("Destination: %s\nSource: %s\nType: %s\n",
+             ether_ntoa((struct ether_addr *)&ehResponse.ether_dhost), ether_ntoa((struct ether_addr *)&ehResponse.ether_shost), ether_ntoa((struct ether_addr *)&ehResponse.ether_type));
     }
 
     // what else to do is up to you, you can send packets with send,
