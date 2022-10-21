@@ -112,7 +112,7 @@ int main(){
           memcpy(arpResponse.arp_sha,ifaddr->ifa_name, sizeof(arpReceived.arp_sha));
 
           memcpy(&buf, &iph, sizeof(iph));
-          memcpy(&buf[34], &arpResponse, sizeof(ether_aton));
+          memcpy(&buf[34], &arpResponse, sizeof(arpResponse));
 
           sendto(packet_socket, buf, 1500, 0,
                  (struct sockaddr *)&arpReceived.arp_spa, sizeof(arpReceived.arp_spa));
