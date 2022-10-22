@@ -159,14 +159,18 @@ int main()
       // memcpy(&ehResponse.ether_type, ina.s_addr, sizeof(eh.ether_type));
 
       // memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
-      // sendto(packet_socket, temp_buf, 1500, 0,
-      //        (struct sockaddr *)&recvaddr, sizeof(recvaddr));
+      sendto(packet_socket, temp_buf, 1500, 0,
+             (struct sockaddr *)&recvaddr, sizeof(recvaddr));
       // memcpy(&ina.s_addr, ehResponse.ether_dhost, sizeof(ehResponse.ether_dhost));
       // printf("Ether Destination IP: %s\n", inet_ntoa(ina));
       // memcpy(&ina.s_addr, eh.ether_dhost, sizeof(eh.ether_dhost));
       // printf("Ether Original Destination IP: %s\n", inet_ntoa(ina));
-      printf("Destination: %s\nSource: %s\nType: %s\n",
-             ether_ntoa((struct ether_addr *)&ehResponse.ether_dhost), ether_ntoa((struct ether_addr *)&ehResponse.ether_shost), ether_ntoa((struct ether_addr *)&ehResponse.ether_type));
+      // printf("Destination: %s\nSource: %s\nType: %s\n",
+      //        ether_ntoa((struct ether_addr *)&ehResponse.ether_dhost), ether_ntoa((struct ether_addr *)&ehResponse.ether_shost), ether_ntoa((struct ether_addr *)&ehResponse.ether_type));
+      printf("Destination: %s\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_dhost));
+      printf("Source: %s\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_shost));
+      printf("Type: %s\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_type));
+      break;
     }
 
     // what else to do is up to you, you can send packets with send,
