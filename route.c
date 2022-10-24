@@ -88,6 +88,7 @@ int main()
       }
     }
   }
+
   // loop and recieve packets. We are only looking at one interface,
   // for the project you will probably want to look at more (to do so,
   // a good way is to have one socket per interface and use select to
@@ -170,6 +171,9 @@ int main()
         memcpy(&arpReceived, &buf[14], sizeof(arpReceived));
 
         struct ether_arp arpResponse;
+        arpResponse.ea_hdr.ar_op = (u_short)257;
+        printf("ether header arp code received %u\n", arpReceived.ea_hdr.ar_op);
+        printf("ether header arp code response %u\n", arpResponse.ea_hdr.ar_op);
 
         // create ARP packet to the request with previous information and host MAC address
         memcpy(arpResponse.arp_tha, arpReceived.arp_sha, sizeof(arpReceived.arp_sha));
@@ -177,6 +181,7 @@ int main()
         memcpy(arpResponse.arp_spa, arpReceived.arp_tpa, sizeof(arpReceived.arp_tpa));
         memcpy(arpResponse.arp_sha, ifaddr->ifa_name, sizeof(arpReceived.arp_sha));
 
+        printf("Arp sender address: %hhn\n", arpReceived.arp_sha);
         memcpy(&temp_buf[14], &arpResponse, sizeof(arpResponse));
         struct ether_header ehResponse;
 
@@ -189,7 +194,7 @@ int main()
 
         printf("Destination: %s\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_dhost));
         printf("Source: %s\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_shost));
-        printf("Type:a %s\n\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_type));
+        printf("Type: %s\n\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_type));
         printf("Type without address format: %d\n", ntohs(ehResponse.ether_type));
         int success = send(packet_socket, temp_buf, n, 0);
         // int success = sendto(packet_socket, temp_buf, 42, 0,
@@ -205,7 +210,7 @@ int main()
         }
         uint16_t reset = 0x0;
         memcpy(&eh.ether_type, &reset, sizeof(eh.ether_type));
-        break;
+        // break;
       }
     }
     if (FD_ISSET(STDIN_FILENO, &tmp))
