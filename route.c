@@ -111,7 +111,7 @@ int main()
       int n = recvfrom(packet_socket, buf, 1500, 0, (struct sockaddr *)&recvaddr, &recvaddrlen);
       printf("Packet socket after receive: %d\n\n", packet_socket);
       printf("Got a %d byte packet\n", n);
-      char temp_buf[n];
+      char temp_buf[1500];
       printf("Size of temp buf now: %ld\n", sizeof(temp_buf));
 
       // ignore outgoing packets (we can't disable some from being sent
@@ -149,7 +149,7 @@ int main()
         memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
         memcpy(&temp_buf[34], &icmp, sizeof(icmp));
 
-        int success = send(packet_socket, temp_buf, n, 0);
+        int success = send(packet_socket, temp_buf, 1500, 0);
         // int success = sendto(packet_socket, temp_buf, 42, 0,
         //                      (struct sockaddr *)&recvaddr, sizeof(recvaddr));
         if (success == -1)
@@ -171,9 +171,21 @@ int main()
         memcpy(&arpReceived, &buf[14], sizeof(arpReceived));
 
         struct ether_arp arpResponse;
-        arpResponse.ea_hdr.ar_op = (u_short)257;
+
+        arpResponse = arpReceived;
+        arpResponse.ea_hdr.ar_op = 2;
+
         printf("ether header arp code received %u\n", arpReceived.ea_hdr.ar_op);
+        printf("ether header arp received hln %u\n", arpReceived.ea_hdr.ar_hln);
+        printf("ether header arp received hrd %u\n", arpReceived.ea_hdr.ar_hrd);
+        printf("ether header arp received pln %u\n", arpReceived.ea_hdr.ar_pln);
+        printf("ether header arp received pro %u\n\n", arpReceived.ea_hdr.ar_pro);
+        
         printf("ether header arp code response %u\n", arpResponse.ea_hdr.ar_op);
+        printf("ether header arp response hln %u\n", arpResponse.ea_hdr.ar_hln);
+        printf("ether header arp response hrd %u\n", arpResponse.ea_hdr.ar_hrd);
+        printf("ether header arp response pln %u\n", arpResponse.ea_hdr.ar_pln);
+        printf("ether header arp response pro %u\n\n", arpResponse.ea_hdr.ar_pro);
 
         // create ARP packet to the request with previous information and host MAC address
         memcpy(arpResponse.arp_tha, arpReceived.arp_sha, sizeof(arpReceived.arp_sha));
@@ -186,7 +198,7 @@ int main()
         struct ether_header ehResponse;
 
         memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
-        memcpy(ehResponse.ether_shost, arpResponse.arp_sha, sizeof(arpResponse.arp_sha));
+        memcpy(ehResponse.ether_shost, ifaddr->ifa_name, sizeof(ifaddr->ifa_name));
         memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
 
         printf("Size of eh Response: %ld\n\n", sizeof(ehResponse));
@@ -196,7 +208,7 @@ int main()
         printf("Source: %s\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_shost));
         printf("Type: %s\n\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_type));
         printf("Type without address format: %d\n", ntohs(ehResponse.ether_type));
-        int success = send(packet_socket, temp_buf, n, 0);
+        int success = send(packet_socket, temp_buf, 1500, 0);
         // int success = sendto(packet_socket, temp_buf, 42, 0,
         //                      (struct sockaddr *)&recvaddr, sizeof(recvaddr));
         if (success == -1)
