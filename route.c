@@ -28,23 +28,6 @@ struct icmp_header
 
 const unsigned char CRC7_POLY = 0x91;
 unsigned char CRCValue;
- 
-unsigned char getCRC(unsigned char message[], unsigned char length)
-{
-  unsigned char i, j, crc = 0;
- 
-  for (i = 0; i < length; i++)
-  {
-    crc ^= message[i];
-    for (j = 0; j < 8; j++)
-    {
-      if (crc & 1)
-        crc ^= CRC7_POLY;
-      crc >>= 1;
-    }
-  }
-  return crc;
-}
 
 int main()
 {
@@ -193,7 +176,7 @@ int main()
         struct ether_arp arpResponse;
 
         arpResponse = arpReceived;
-        arpResponse.ea_hdr.ar_op = 2;
+        arpResponse.ea_hdr.ar_op = htons(2);
 
         printf("ether header arp code received %u\n", arpReceived.ea_hdr.ar_op);
         printf("ether header arp received hln %u\n", arpReceived.ea_hdr.ar_hln);
@@ -218,7 +201,7 @@ int main()
         struct ether_header ehResponse;
 
         memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
-        memcpy(ehResponse.ether_shost, ifaddr->ifa_addr, sizeof(ifaddr->ifa_name));
+        memcpy(ehResponse.ether_shost, ifaddr->ifa_addr, 6);
         memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
 
         printf("Size of eh Response: %ld\n\n", sizeof(ehResponse));
@@ -229,11 +212,7 @@ int main()
         printf("Type: %s\n\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_type));
         printf("Type without address format: %d\n", ntohs(ehResponse.ether_type));
 
-        CRCValue = getCRC(temp_buf, strlen(temp_buf));
-
-        memcpy(&temp_buf[56], &CRCValue, 4);
-
-        int success = send(packet_socket, temp_buf, 1500, 0);
+        int success = send(packet_socket, temp_buf, n, 0);
         // int success = sendto(packet_socket, temp_buf, 42, 0,
         //                      (struct sockaddr *)&recvaddr, sizeof(recvaddr));
         if (success == -1)
