@@ -2,12 +2,12 @@
 #include <netpacket/packet.h>
 #include <net/ethernet.h>
 #include <stdio.h>
-//#include <errno.h>
-//#include <sys/types.h>
+#include <errno.h>
+#include <sys/types.h>
 #include <ifaddrs.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
-//#include <net/if.h>
+#include <net/if.h>
 #include <string.h>
 #include <netinet/ether.h>
 #include <netinet/ip.h>
@@ -58,6 +58,7 @@ int main()
       if (!strncmp(&(tmp->ifa_name[3]), "eth1", 4))
       {
         printf("Creating Socket on interface %s\n", tmp->ifa_name);
+        //printf("interface MAC : %s", ether_ntoa((struct ether_addr *)&tmp->ifa_addr));
         // create a packet socket
         // AF_PACKET makes it a packet socket
         // SOCK_RAW makes it so we get the entire packet
@@ -136,6 +137,9 @@ int main()
 
         // build IP portion
         memcpy(&iph, &buf[14], sizeof(iph));
+
+        memcpy(&iphResponse, &iph, sizeof(iph));
+        
         memcpy(&iphResponse.saddr, &iph.daddr, sizeof(iph.daddr));
         memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
         // build EH portion
@@ -152,7 +156,7 @@ int main()
         memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
         memcpy(&temp_buf[34], &icmp, sizeof(icmp));
 
-        int success = send(packet_socket, temp_buf, 1500, 0);
+        int success = send(packet_socket, temp_buf, n, 0);
         // int success = sendto(packet_socket, temp_buf, 42, 0,
         //                      (struct sockaddr *)&recvaddr, sizeof(recvaddr));
         if (success == -1)
