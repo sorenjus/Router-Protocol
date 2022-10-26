@@ -26,9 +26,6 @@ struct icmp_header
   uint16_t seqnum;
 };
 
-const unsigned char CRC7_POLY = 0x91;
-unsigned char CRCValue;
-
 int main()
 {
   int packet_socket;
@@ -40,7 +37,7 @@ int main()
   // common since most interfaces will have a MAC, IPv4, and IPv6
   // address. You can use the names to match up which IPv4 address goes
   // with which MAC address.
-  struct ifaddrs *ifaddr, *tmp;
+  struct ifaddrs *ifaddr, *tmp, *interfaceAddr;
   if (getifaddrs(&ifaddr) == -1)
   {
     perror("getifaddrs");
@@ -68,6 +65,9 @@ int main()
         // ETH_P_ALL indicates we want all (upper layer) protocols
         // we could specify just a specific one
         packet_socket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+
+        interfaceAddr = tmp;
+
         if (packet_socket < 0)
         {
           perror("socket");
@@ -194,14 +194,14 @@ int main()
         memcpy(arpResponse.arp_tha, arpReceived.arp_sha, sizeof(arpReceived.arp_sha));
         memcpy(arpResponse.arp_tpa, arpReceived.arp_spa, sizeof(arpReceived.arp_spa));
         memcpy(arpResponse.arp_spa, arpReceived.arp_tpa, sizeof(arpReceived.arp_tpa));
-        memcpy(arpResponse.arp_sha, ifaddr->ifa_addr, sizeof(arpReceived.arp_sha));
+        memcpy(arpResponse.arp_sha, interfaceAddr, sizeof(arpReceived.arp_sha));
 
         printf("Arp sender address: %hhn\n", arpReceived.arp_sha);
         memcpy(&temp_buf[14], &arpResponse, sizeof(arpResponse));
         struct ether_header ehResponse;
 
         memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
-        memcpy(ehResponse.ether_shost, ifaddr->ifa_addr, 6);
+        memcpy(ehResponse.ether_shost, interfaceAddr, 6);
         memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
 
         printf("Size of eh Response: %ld\n\n", sizeof(ehResponse));
