@@ -40,8 +40,10 @@ int main()
   // common since most interfaces will have a MAC, IPv4, and IPv6
   // address. You can use the names to match up which IPv4 address goes
   // with which MAC address.
-  struct ifaddrs *ifaddr, *tmp, *interfaceAddr;
+  struct ifaddrs *ifaddr, *tmp, interfaceAddr;
   struct sockaddr_ll macAddr;
+  unsigned char *ptr;
+  char macp[INET6_ADDRSTRLEN];
   if (getifaddrs(&ifaddr) == -1)
   {
     perror("getifaddrs");
@@ -71,7 +73,16 @@ int main()
         //  we could specify just a specific one
         packet_socket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 
-        memcpy(macAddr.sll_addr, tmp->ifa_addr, 8);
+        //memcpy(&macAddr.sll_addr, &tmp->ifa_addr, 8);
+       interfaceAddr = *tmp;
+
+	struct sockaddr_ll *s = (struct sockaddr_ll*)(tmp->ifa_addr);
+                    int i;
+                    int len = 0;
+                    for (i = 0; i < 6; i++) {
+                        len += sprintf(macp+len, "%02X%s", s->sll_addr[i], i < 5 ? ":":"");
+                    }
+                    printf("%s: %s\n", (ifaddr)->ifa_name, macp);
 
         if (packet_socket < 0)
         {
@@ -201,7 +212,7 @@ int main()
 
         arpResponse = arpReceived;
         arpResponse.ea_hdr.ar_op = htons(2);
-
+     
         printf("ether header arp code received %u\n", arpReceived.ea_hdr.ar_op);
         printf("ether header arp received hln %u\n", arpReceived.ea_hdr.ar_hln);
         printf("ether header arp received hrd %u\n", arpReceived.ea_hdr.ar_hrd);
@@ -213,19 +224,26 @@ int main()
         printf("ether header arp response hrd %u\n", arpResponse.ea_hdr.ar_hrd);
         printf("ether header arp response pln %u\n", arpResponse.ea_hdr.ar_pln);
         printf("ether header arp response pro %u\n\n", arpResponse.ea_hdr.ar_pro);
-
+        
         // create ARP packet to the request with previous information and host MAC address
         memcpy(arpResponse.arp_tha, arpReceived.arp_sha, sizeof(arpReceived.arp_sha));
         memcpy(arpResponse.arp_tpa, arpReceived.arp_spa, sizeof(arpReceived.arp_spa));
         memcpy(arpResponse.arp_spa, arpReceived.arp_tpa, sizeof(arpReceived.arp_tpa));
-        memcpy(arpResponse.arp_sha, macAddr.sll_addr, sizeof(arpReceived.arp_sha));
+        memcpy(arpResponse.arp_sha, ether_aton(macp), 6);
+        //memcpy(arpResponse.arp_sha, ether_aton((char *)interfaceAddr->ifa_addr), sizeof(arpReceived.arp_sha));
+        //memcpy(arpResponse.arp_sha, interfaceAddr->ifa_addr, sizeof(arpReceived.arp_sha));
+        //memcpy(arpResponse.arp_sha, ether_aton(macAddr.sll_addr), sizeof(arpReceived.arp_sha));// seg fault
+        //memcpy(arpResponse.arp_sha, ether_aton(*interfaceAddr.ifa_addr), sizeof(arpReceived.arp_sha));
+        //arpResponse.arp_sha = (struct ether_addr *)ether_aton(macAddr.sll_addr);// seg fault
+        //ether_hostton(macAddr.sll_addr, (struct ether_addr *)arpResponse.arp_sha);
+        //ether_hostton(interfaceAddr->ifa_addr, (struct ether_addr *)arpResponse.arp_sha);
 
         printf("Arp sender address: %hhn\n", arpReceived.arp_sha);
         memcpy(&temp_buf[14], &arpResponse, sizeof(arpResponse));
         struct ether_header ehResponse;
 
         memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
-        memcpy(ehResponse.ether_shost, macAddr.sll_addr, 6);
+        memcpy(ehResponse.ether_shost, arpResponse.arp_sha, 6);
         memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
 
         printf("Size of eh Response: %ld\n\n", sizeof(ehResponse));
