@@ -151,7 +151,7 @@ int main()
         memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
 
         memcpy(&icmp, &buf[34], sizeof(icmp));
-        printf("Temp buf size: %d\n", sizeof(temp_buf));
+        printf("Temp buf size: %ld\n", sizeof(temp_buf));
         // Verify checksum
         // Sequence num is the ttl -- 32 hops and done.  Decrement/Increment ?? if we hit 0, drop packet, and send ICMP time exceeded message.
         printf("ICMP Struct type: %hhu, code: %hhu, checksum: %hhu, id: %hhu, sequence number: %hhu \n", icmp.type, icmp.code, icmp.checksum, icmp.id, icmp.seqnum);
@@ -159,12 +159,16 @@ int main()
         // icmp.code = ntohs(icmp.code);
         // icmp.id = ntohs(icmp.id);
         // icmp.seqnum = ntohs(icmp.seqnum);
-        icmp.checksum = checksum(&temp_buf, sizeof(temp_buf));
+        icmp.checksum = 0;
         // icmp.checksum = ntohs(icmp.checksum);
         printf("ICMP Struct type: %hhu, code: %hhu, checksum: %hhu, id: %hhu, sequence number: %hhu \n", icmp.type, icmp.code, icmp.checksum, icmp.id, icmp.seqnum);
 
         memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
         memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
+        memcpy(&temp_buf[34], &icmp, sizeof(icmp));
+
+        icmp.checksum = checksum(&temp_buf, sizeof(temp_buf));
+
         memcpy(&temp_buf[34], &icmp, sizeof(icmp));
 
         int success = send(packet_socket, temp_buf, n, 0);
