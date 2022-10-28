@@ -16,6 +16,9 @@
 #include <unistd.h>
 #include <sys/select.h>
 #include <stdlib.h>
+#include <netinet/ip_icmp.h>
+
+unsigned short checksum(void *b, int len);
 
 struct icmp_header
 {
@@ -58,13 +61,13 @@ int main()
       if (!strncmp(&(tmp->ifa_name[3]), "eth1", 4))
       {
         printf("Creating Socket on interface %s\n", tmp->ifa_name);
-        //printf("interface MAC : %s", ether_ntoa((struct ether_addr *)&tmp->ifa_addr));
-        // create a packet socket
-        // AF_PACKET makes it a packet socket
-        // SOCK_RAW makes it so we get the entire packet
-        // could also use SOCK_DGRAM to cut off link layer header
-        // ETH_P_ALL indicates we want all (upper layer) protocols
-        // we could specify just a specific one
+        // printf("interface MAC : %s", ether_ntoa((struct ether_addr *)&tmp->ifa_addr));
+        //  create a packet socket
+        //  AF_PACKET makes it a packet socket
+        //  SOCK_RAW makes it so we get the entire packet
+        //  could also use SOCK_DGRAM to cut off link layer header
+        //  ETH_P_ALL indicates we want all (upper layer) protocols
+        //  we could specify just a specific one
         packet_socket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 
         interfaceAddr = tmp;
@@ -100,9 +103,9 @@ int main()
   printf("Ready to recieve now\n");
   while (1)
   {
+    char buf[1500];
     fd_set tmp = myfds;
     int nn = select(FD_SETSIZE, &tmp, NULL, NULL, NULL);
-    char buf[1500];
     struct sockaddr_ll recvaddr;
     unsigned int recvaddrlen = sizeof(struct sockaddr_ll);
     if (FD_ISSET(packet_socket, &tmp))
@@ -115,7 +118,7 @@ int main()
       int n = recvfrom(packet_socket, buf, 1500, 0, (struct sockaddr *)&recvaddr, &recvaddrlen);
       printf("Packet socket after receive: %d\n\n", packet_socket);
       printf("Got a %d byte packet\n", n);
-      char temp_buf[1500];
+      char temp_buf[n];
       printf("Size of temp buf now: %ld\n", sizeof(temp_buf));
 
       // ignore outgoing packets (we can't disable some from being sent
@@ -139,7 +142,7 @@ int main()
         memcpy(&iph, &buf[14], sizeof(iph));
 
         memcpy(&iphResponse, &iph, sizeof(iph));
-        
+
         memcpy(&iphResponse.saddr, &iph.daddr, sizeof(iph.daddr));
         memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
         // build EH portion
@@ -148,8 +151,16 @@ int main()
         memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
 
         memcpy(&icmp, &buf[34], sizeof(icmp));
+        printf("Temp buf size: %d\n", sizeof(temp_buf));
         // Verify checksum
         // Sequence num is the ttl -- 32 hops and done.  Decrement/Increment ?? if we hit 0, drop packet, and send ICMP time exceeded message.
+        printf("ICMP Struct type: %hhu, code: %hhu, checksum: %hhu, id: %hhu, sequence number: %hhu \n", icmp.type, icmp.code, icmp.checksum, icmp.id, icmp.seqnum);
+        icmp.type = ntohs(0x0000);
+        // icmp.code = ntohs(icmp.code);
+        // icmp.id = ntohs(icmp.id);
+        // icmp.seqnum = ntohs(icmp.seqnum);
+        icmp.checksum = checksum(&temp_buf, sizeof(temp_buf));
+        // icmp.checksum = ntohs(icmp.checksum);
         printf("ICMP Struct type: %hhu, code: %hhu, checksum: %hhu, id: %hhu, sequence number: %hhu \n", icmp.type, icmp.code, icmp.checksum, icmp.id, icmp.seqnum);
 
         memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
@@ -176,7 +187,7 @@ int main()
         printf("Type: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_type));
         struct ether_arp arpReceived;
         memcpy(&arpReceived, &buf[14], sizeof(arpReceived));
-        
+
         struct ether_arp arpResponse;
 
         arpResponse = arpReceived;
@@ -187,7 +198,7 @@ int main()
         printf("ether header arp received hrd %u\n", arpReceived.ea_hdr.ar_hrd);
         printf("ether header arp received pln %u\n", arpReceived.ea_hdr.ar_pln);
         printf("ether header arp received pro %u\n\n", arpReceived.ea_hdr.ar_pro);
-        
+
         printf("ether header arp code response %u\n", arpResponse.ea_hdr.ar_op);
         printf("ether header arp response hln %u\n", arpResponse.ea_hdr.ar_hln);
         printf("ether header arp response hrd %u\n", arpResponse.ea_hdr.ar_hrd);
@@ -251,4 +262,20 @@ int main()
   close(packet_socket);
   // exit
   return 0;
+}
+
+unsigned short checksum(void *b, int len)
+{
+  unsigned short *buf = b;
+  unsigned int sum = 0;
+  unsigned short result;
+
+  for (sum = 0; len > 1; len -= 2)
+    sum += *buf++;
+  if (len == 1)
+    sum += *(unsigned char *)buf;
+  sum = (sum >> 16) + (sum & 0xFFFF);
+  sum += (sum >> 16);
+  result = ~sum;
+  return result;
 }
