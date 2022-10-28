@@ -171,7 +171,7 @@ int main()
         memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
         memcpy(&temp_buf[34], &icmp, sizeof(icmp));
         // Data - size of data is hard coded, so def need to change.
-        memcpy(&temp_buf[42], &buf[42], 56);
+        memcpy(&temp_buf[42], &buf[42], n-42);
         icmp.checksum = checksum(&temp_buf[34], n - 34);
         printf("NEW CHECKSUM: %hhu\n", icmp.checksum);
         memcpy(&temp_buf[36], &icmp.checksum, 2);
