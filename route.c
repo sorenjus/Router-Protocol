@@ -151,22 +151,30 @@ int main()
         memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
 
         memcpy(&icmp, &buf[34], sizeof(icmp));
-        printf("Temp buf size: %d\n", sizeof(temp_buf));
+        printf("Temp buf size: %ld\n", sizeof(temp_buf));
         // Verify checksum
         // Sequence num is the ttl -- 32 hops and done.  Decrement/Increment ?? if we hit 0, drop packet, and send ICMP time exceeded message.
         printf("ICMP Struct type: %hhu, code: %hhu, checksum: %hhu, id: %hhu, sequence number: %hhu \n", icmp.type, icmp.code, icmp.checksum, icmp.id, icmp.seqnum);
         icmp.type = ntohs(0x0000);
+        icmp.checksum = 0;
+
         // icmp.code = ntohs(icmp.code);
         // icmp.id = ntohs(icmp.id);
         // icmp.seqnum = ntohs(icmp.seqnum);
-        icmp.checksum = checksum(&temp_buf, sizeof(temp_buf));
+        // Idea for checksum ? checksum - 0x0800
+        // Difference is in the type of the reply
+        // Also, consider why the data is 48 bytes for the sender and 56 bytes when we send it.
         // icmp.checksum = ntohs(icmp.checksum);
         printf("ICMP Struct type: %hhu, code: %hhu, checksum: %hhu, id: %hhu, sequence number: %hhu \n", icmp.type, icmp.code, icmp.checksum, icmp.id, icmp.seqnum);
 
         memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
         memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
         memcpy(&temp_buf[34], &icmp, sizeof(icmp));
-
+        // Data - size of data is hard coded, so def need to change.
+        memcpy(&temp_buf[42], &buf[42], 48);
+        icmp.checksum = checksum(&temp_buf, sizeof(temp_buf));
+        printf("NEW CHECKSUM: %hhu\n", icmp.checksum);
+        memcpy(&temp_buf[36], &icmp.checksum, 2);
         int success = send(packet_socket, temp_buf, n, 0);
         // int success = sendto(packet_socket, temp_buf, 42, 0,
         //                      (struct sockaddr *)&recvaddr, sizeof(recvaddr));
