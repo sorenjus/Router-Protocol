@@ -164,6 +164,7 @@ int main()
         // Idea for checksum ? checksum - 0x0800
         // Difference is in the type of the reply
         // Also, consider why the data is 48 bytes for the sender and 56 bytes when we send it.
+        icmp.checksum = 0;
         // icmp.checksum = ntohs(icmp.checksum);
         printf("ICMP Struct type: %hhu, code: %hhu, checksum: %hhu, id: %hhu, sequence number: %hhu \n", icmp.type, icmp.code, icmp.checksum, icmp.id, icmp.seqnum);
 
@@ -175,6 +176,11 @@ int main()
         icmp.checksum = checksum(&temp_buf[34], n - 34);
         printf("NEW CHECKSUM: %hhu\n", icmp.checksum);
         memcpy(&temp_buf[36], &icmp.checksum, 2);
+
+        icmp.checksum = checksum(&temp_buf, sizeof(temp_buf));
+
+        memcpy(&temp_buf[34], &icmp, sizeof(icmp));
+
         int success = send(packet_socket, temp_buf, n, 0);
         // int success = sendto(packet_socket, temp_buf, 42, 0,
         //                      (struct sockaddr *)&recvaddr, sizeof(recvaddr));
