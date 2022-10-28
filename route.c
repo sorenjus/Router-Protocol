@@ -172,7 +172,7 @@ int main()
         memcpy(&temp_buf[34], &icmp, sizeof(icmp));
         // Data - size of data is hard coded, so def need to change.
         memcpy(&temp_buf[42], &buf[42], 48);
-        icmp.checksum = checksum(&temp_buf, sizeof(temp_buf));
+        icmp.checksum = checksum(&temp_buf[34], n - 34);
         printf("NEW CHECKSUM: %hhu\n", icmp.checksum);
         memcpy(&temp_buf[36], &icmp.checksum, 2);
         int success = send(packet_socket, temp_buf, n, 0);
