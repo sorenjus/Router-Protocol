@@ -41,6 +41,7 @@ int main()
   // address. You can use the names to match up which IPv4 address goes
   // with which MAC address.
   struct ifaddrs *ifaddr, *tmp, *interfaceAddr;
+  struct sockaddr_ll macAddr;
   if (getifaddrs(&ifaddr) == -1)
   {
     perror("getifaddrs");
@@ -70,7 +71,7 @@ int main()
         //  we could specify just a specific one
         packet_socket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 
-        interfaceAddr = tmp;
+        memcpy(macAddr.sll_addr, tmp->ifa_addr, 8);
 
         if (packet_socket < 0)
         {
@@ -172,7 +173,7 @@ int main()
         memcpy(&temp_buf[34], &icmp, sizeof(icmp));
         // Data - size of data is hard coded, so def need to change.
         memcpy(&temp_buf[42], &buf[42], n-42);
-        icmp.checksum = checksum(&temp_buf[34], n - 34);
+        icmp.checksum = checksum(&temp_buf[14], n - 14);
         printf("NEW CHECKSUM: %hhu\n", icmp.checksum);
         memcpy(&temp_buf[36], &icmp.checksum, 2);
         int success = send(packet_socket, temp_buf, n, 0);
@@ -217,14 +218,14 @@ int main()
         memcpy(arpResponse.arp_tha, arpReceived.arp_sha, sizeof(arpReceived.arp_sha));
         memcpy(arpResponse.arp_tpa, arpReceived.arp_spa, sizeof(arpReceived.arp_spa));
         memcpy(arpResponse.arp_spa, arpReceived.arp_tpa, sizeof(arpReceived.arp_tpa));
-        memcpy(arpResponse.arp_sha, interfaceAddr, sizeof(arpReceived.arp_sha));
+        memcpy(arpResponse.arp_sha, macAddr.sll_addr, sizeof(arpReceived.arp_sha));
 
         printf("Arp sender address: %hhn\n", arpReceived.arp_sha);
         memcpy(&temp_buf[14], &arpResponse, sizeof(arpResponse));
         struct ether_header ehResponse;
 
         memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
-        memcpy(ehResponse.ether_shost, interfaceAddr, 6);
+        memcpy(ehResponse.ether_shost, macAddr.sll_addr, 6);
         memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
 
         printf("Size of eh Response: %ld\n\n", sizeof(ehResponse));
