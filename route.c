@@ -40,7 +40,7 @@ int main()
   // common since most interfaces will have a MAC, IPv4, and IPv6
   // address. You can use the names to match up which IPv4 address goes
   // with which MAC address.
-  struct ifaddrs *ifaddr, *tmp, interfaceAddr;
+  struct ifaddrs *ifaddr, *tmp;
   struct sockaddr_ll macAddr;
   unsigned char *ptr;
   char macp[INET6_ADDRSTRLEN];
@@ -73,16 +73,13 @@ int main()
         //  we could specify just a specific one
         packet_socket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 
-        //memcpy(&macAddr.sll_addr, &tmp->ifa_addr, 8);
-       interfaceAddr = *tmp;
-
-	struct sockaddr_ll *s = (struct sockaddr_ll*)(tmp->ifa_addr);
-                    int i;
-                    int len = 0;
-                    for (i = 0; i < 6; i++) {
-                        len += sprintf(macp+len, "%02X%s", s->sll_addr[i], i < 5 ? ":":"");
-                    }
-                    printf("%s: %s\n", (ifaddr)->ifa_name, macp);
+	      struct sockaddr_ll *s = (struct sockaddr_ll*)(tmp->ifa_addr);
+        int i;
+        int len = 0;
+        for (i = 0; i < 6; i++) {
+          len += sprintf(macp+len, "%02X%s", s->sll_addr[i], i < 5 ? ":":"");
+        }
+        printf("Interface name : %s\n Interface Address : %s\n", (ifaddr)->ifa_name, macp);
 
         if (packet_socket < 0)
         {
@@ -170,13 +167,6 @@ int main()
         icmp.type = ntohs(0x0000);
         icmp.checksum = 0;
 
-        // icmp.code = ntohs(icmp.code);
-        // icmp.id = ntohs(icmp.id);
-        // icmp.seqnum = ntohs(icmp.seqnum);
-        // Idea for checksum ? checksum - 0x0800
-        // Difference is in the type of the reply
-        // Also, consider why the data is 48 bytes for the sender and 56 bytes when we send it.
-        // icmp.checksum = ntohs(icmp.checksum);
         printf("ICMP Struct type: %hhu, code: %hhu, checksum: %hhu, id: %hhu, sequence number: %hhu \n", icmp.type, icmp.code, icmp.checksum, icmp.id, icmp.seqnum);
 
         memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
@@ -184,8 +174,9 @@ int main()
         memcpy(&temp_buf[34], &icmp, sizeof(icmp));
         // Data - size of data is hard coded, so def need to change.
         memcpy(&temp_buf[42], &buf[42], n-42);
+
         icmp.checksum = checksum(&temp_buf[14], n - 14);
-        printf("NEW CHECKSUM: %hhu\n", icmp.checksum);
+        
         memcpy(&temp_buf[36], &icmp.checksum, 2);
         int success = send(packet_socket, temp_buf, n, 0);
         // int success = sendto(packet_socket, temp_buf, 42, 0,
@@ -202,44 +193,22 @@ int main()
       else if (ntohs(eh.ether_type) == 0x0806)
       {
         printf("Packet socket in ARP Request: %d\n\n", packet_socket);
-        printf("Destination: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_dhost));
-        printf("Source: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_shost));
-        printf("Type: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_type));
-        struct ether_arp arpReceived;
-        memcpy(&arpReceived, &buf[14], sizeof(arpReceived));
+        printf("Received Ether Destination: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_dhost));
+        printf("Received Ether Source: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_shost));
+        printf("Received Ether Type: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_type));
 
-        struct ether_arp arpResponse;
+        struct ether_arp arpReceived,arpResponse;
+        memcpy(&arpReceived, &buf[14], sizeof(arpReceived));
 
         arpResponse = arpReceived;
         arpResponse.ea_hdr.ar_op = htons(2);
      
-        printf("ether header arp code received %u\n", arpReceived.ea_hdr.ar_op);
-        printf("ether header arp received hln %u\n", arpReceived.ea_hdr.ar_hln);
-        printf("ether header arp received hrd %u\n", arpReceived.ea_hdr.ar_hrd);
-        printf("ether header arp received pln %u\n", arpReceived.ea_hdr.ar_pln);
-        printf("ether header arp received pro %u\n\n", arpReceived.ea_hdr.ar_pro);
-
-        printf("ether header arp code response %u\n", arpResponse.ea_hdr.ar_op);
-        printf("ether header arp response hln %u\n", arpResponse.ea_hdr.ar_hln);
-        printf("ether header arp response hrd %u\n", arpResponse.ea_hdr.ar_hrd);
-        printf("ether header arp response pln %u\n", arpResponse.ea_hdr.ar_pln);
-        printf("ether header arp response pro %u\n\n", arpResponse.ea_hdr.ar_pro);
-        
         // create ARP packet to the request with previous information and host MAC address
         memcpy(arpResponse.arp_tha, arpReceived.arp_sha, sizeof(arpReceived.arp_sha));
         memcpy(arpResponse.arp_tpa, arpReceived.arp_spa, sizeof(arpReceived.arp_spa));
         memcpy(arpResponse.arp_spa, arpReceived.arp_tpa, sizeof(arpReceived.arp_tpa));
         memcpy(arpResponse.arp_sha, ether_aton(macp), 6);
-        //memcpy(arpResponse.arp_sha, ether_aton((char *)interfaceAddr->ifa_addr), sizeof(arpReceived.arp_sha));
-        //memcpy(arpResponse.arp_sha, interfaceAddr->ifa_addr, sizeof(arpReceived.arp_sha));
-        //memcpy(arpResponse.arp_sha, ether_aton(macAddr.sll_addr), sizeof(arpReceived.arp_sha));// seg fault
-        //memcpy(arpResponse.arp_sha, ether_aton(*interfaceAddr.ifa_addr), sizeof(arpReceived.arp_sha));
-        //arpResponse.arp_sha = (struct ether_addr *)ether_aton(macAddr.sll_addr);// seg fault
-        //ether_hostton(macAddr.sll_addr, (struct ether_addr *)arpResponse.arp_sha);
-        //ether_hostton(interfaceAddr->ifa_addr, (struct ether_addr *)arpResponse.arp_sha);
-
-        printf("Arp sender address: %hhn\n", arpReceived.arp_sha);
-        memcpy(&temp_buf[14], &arpResponse, sizeof(arpResponse));
+        
         struct ether_header ehResponse;
 
         memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
@@ -248,11 +217,11 @@ int main()
 
         printf("Size of eh Response: %ld\n\n", sizeof(ehResponse));
         memcpy(&temp_buf[0], &ehResponse, sizeof(ehResponse));
+        memcpy(&temp_buf[14], &arpResponse, sizeof(arpResponse));
 
-        printf("Destination: %s\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_dhost));
-        printf("Source: %s\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_shost));
-        printf("Type: %s\n\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_type));
-        printf("Type without address format: %d\n", ntohs(ehResponse.ether_type));
+        printf("Response Ether Destination: %s\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_dhost));
+        printf("Response Ether Source: %s\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_shost));
+        printf("Response Ether Type: %s\n\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_type));
 
         int success = send(packet_socket, temp_buf, n, 0);
         // int success = sendto(packet_socket, temp_buf, 42, 0,
