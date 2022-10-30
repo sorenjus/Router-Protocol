@@ -42,7 +42,7 @@ int main()
   // common since most interfaces will have a MAC, IPv4, and IPv6
   // address. You can use the names to match up which IPv4 address goes
   // with which MAC address.
-  struct ifaddrs *ifaddr, *tmp;
+  struct ifaddrs *ifaddr, *tmp, *interfaceAddr;
   struct ifreq ifr;
   char macp[INET6_ADDRSTRLEN];
   if (getifaddrs(&ifaddr) == -1)
@@ -75,28 +75,8 @@ int main()
         //  we could specify just a specific one
         packet_socket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 
-        struct sockaddr_ll *s = (struct sockaddr_ll *)(tmp->ifa_addr);
-        int i;
-        int len = 0;
-        for (i = 0; i < 6; i++)
-        {
-          len += sprintf(macp + len, "%02X%s", s->sll_addr[i], i < 5 ? ":" : "");
-        }
-        printf("Interface name : %s\n Interface Address : %s\n", (ifaddr)->ifa_name, macp);
-        printf("Mac and macp size: %s %ld\n", macp, sizeof(macp));
-        memcpy(&buffer[counter], macp, sizeof(macp));
-        printf("Buffer at %d: %s\n", counter, &buffer[counter]);
-        counter += sizeof(macp);
+        interfaceAddr = tmp;
 
-        char *ip;
-        ifr.ifr_ifru.ifru_addr.sa_family = AF_INET;
-        strncpy(ifr.ifr_name, tmp->ifa_name, IFNAMSIZ - 1);
-        ioctl(packet_socket, SIOCGIFADDR, &ifr);
-        ip = inet_ntoa(((struct sockaddr_in *)&ifr.ifr_ifru.ifru_addr)->sin_addr);
-        printf("Ip and ip size : %s %ld\n", ip, sizeof(ip));
-        memcpy(&buffer[counter], ip, sizeof(ip));
-        printf("Buffer at %d: %s\n", counter, &buffer[counter]);
-        counter += sizeof(ip);
         if (packet_socket < 0)
         {
           perror("socket");
@@ -128,12 +108,13 @@ int main()
   printf("Ready to recieve now\n");
   while (1)
   {
+    
     char buf[1500];
-    fd_set tmp = myfds;
-    int nn = select(FD_SETSIZE, &tmp, NULL, NULL, NULL);
+    fd_set fdstmp = myfds;
+    int nn = select(FD_SETSIZE, &fdstmp, NULL, NULL, NULL);
     struct sockaddr_ll recvaddr;
     unsigned int recvaddrlen = sizeof(struct sockaddr_ll);
-    if (FD_ISSET(packet_socket, &tmp))
+    if (FD_ISSET(packet_socket, &fdstmp))
     {
       // we can use recv, since the addresses are in the packet, but we
       // use recvfrom because it gives us an easy way to determine if
@@ -204,6 +185,30 @@ int main()
       // when an ARP request is processed, respond
       else if (ntohs(eh.ether_type) == 0x0806)
       {
+        struct sockaddr_ll *s = (struct sockaddr_ll *)(interfaceAddr->ifa_addr);
+        int i;
+        int len = 0;
+        for (i = 0; i < 6; i++)
+        {
+          len += sprintf(macp + len, "%02X%s", s->sll_addr[i], i < 5 ? ":" : "");
+        }
+        printf("Interface name : %s\n Interface Address : %s\n", (ifaddr)->ifa_name, macp);
+        printf("Mac and macp size: %s %ld\n", macp, sizeof(macp));
+        memcpy(&buffer[counter], macp, sizeof(macp));
+        printf("Buffer at %d: %s\n", counter, &buffer[counter]);
+        counter += sizeof(macp);
+
+        char *ip;
+        ifr.ifr_ifru.ifru_addr.sa_family = AF_INET;
+        strncpy(ifr.ifr_name, interfaceAddr->ifa_name, IFNAMSIZ - 1);
+        ioctl(packet_socket, SIOCGIFADDR, &ifr);
+        ip = inet_ntoa(((struct sockaddr_in *)&ifr.ifr_ifru.ifru_addr)->sin_addr);
+        printf("Ip and ip size : %s %ld\n", ip, sizeof(ip));
+        memcpy(&buffer[counter], ip, sizeof(ip));
+        printf("Buffer at %d: %s\n", counter, &buffer[counter]);
+        counter += sizeof(ip);
+
+
         printf("Packet socket in ARP Request: %d\n\n", packet_socket);
         printf("Received Ether Destination: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_dhost));
         printf("Received Ether Source: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_shost));
@@ -255,7 +260,7 @@ int main()
         memcpy(&eh.ether_type, &reset, sizeof(eh.ether_type));
       }
     }
-    if (FD_ISSET(STDIN_FILENO, &tmp))
+    if (FD_ISSET(STDIN_FILENO, &fdstmp))
     {
       printf("The user typed something, I better do something with it\n");
       char buf[5000];
