@@ -16,7 +16,9 @@
 #include <unistd.h>
 #include <sys/select.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 #include <netinet/ip_icmp.h>
+#include <netdb.h>
 
 unsigned short checksum(void *b, int len);
 
@@ -41,14 +43,15 @@ int main()
   // address. You can use the names to match up which IPv4 address goes
   // with which MAC address.
   struct ifaddrs *ifaddr, *tmp;
-  struct sockaddr_ll macAddr;
-  unsigned char *ptr;
+  struct ifreq ifr;
   char macp[INET6_ADDRSTRLEN];
   if (getifaddrs(&ifaddr) == -1)
   {
     perror("getifaddrs");
     return 1;
   }
+  int counter = 0;
+  char buffer[1024];
   // have the list, loop over the list
   for (tmp = ifaddr; tmp != NULL; tmp = tmp->ifa_next)
   {
@@ -64,7 +67,6 @@ int main()
       if (!strncmp(&(tmp->ifa_name[3]), "eth1", 4))
       {
         printf("Creating Socket on interface %s\n", tmp->ifa_name);
-        // printf("interface MAC : %s", ether_ntoa((struct ether_addr *)&tmp->ifa_addr));
         //  create a packet socket
         //  AF_PACKET makes it a packet socket
         //  SOCK_RAW makes it so we get the entire packet
@@ -73,14 +75,28 @@ int main()
         //  we could specify just a specific one
         packet_socket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 
-	      struct sockaddr_ll *s = (struct sockaddr_ll*)(tmp->ifa_addr);
+        struct sockaddr_ll *s = (struct sockaddr_ll *)(tmp->ifa_addr);
         int i;
         int len = 0;
-        for (i = 0; i < 6; i++) {
-          len += sprintf(macp+len, "%02X%s", s->sll_addr[i], i < 5 ? ":":"");
+        for (i = 0; i < 6; i++)
+        {
+          len += sprintf(macp + len, "%02X%s", s->sll_addr[i], i < 5 ? ":" : "");
         }
         printf("Interface name : %s\n Interface Address : %s\n", (ifaddr)->ifa_name, macp);
+        printf("Mac and macp size: %s %ld\n", macp, sizeof(macp));
+        memcpy(&buffer[counter], macp, sizeof(macp));
+        printf("Buffer at %d: %s\n", counter, &buffer[counter]);
+        counter += sizeof(macp);
 
+        char *ip;
+        ifr.ifr_ifru.ifru_addr.sa_family = AF_INET;
+        strncpy(ifr.ifr_name, tmp->ifa_name, IFNAMSIZ - 1);
+        ioctl(packet_socket, SIOCGIFADDR, &ifr);
+        ip = inet_ntoa(((struct sockaddr_in *)&ifr.ifr_ifru.ifru_addr)->sin_addr);
+        printf("Ip and ip size : %s %ld\n", ip, sizeof(ip));
+        memcpy(&buffer[counter], ip, sizeof(ip));
+        printf("Buffer at %d: %s\n", counter, &buffer[counter]);
+        counter += sizeof(ip);
         if (packet_socket < 0)
         {
           perror("socket");
@@ -173,21 +189,17 @@ int main()
         memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
         memcpy(&temp_buf[34], &icmp, sizeof(icmp));
         // Data - size of data is hard coded, so def need to change.
-        memcpy(&temp_buf[42], &buf[42], n-42);
+        memcpy(&temp_buf[42], &buf[42], n - 42);
 
         icmp.checksum = checksum(&temp_buf[14], n - 14);
-        
+
         memcpy(&temp_buf[36], &icmp.checksum, 2);
         int success = send(packet_socket, temp_buf, n, 0);
-        // int success = sendto(packet_socket, temp_buf, 42, 0,
-        //                      (struct sockaddr *)&recvaddr, sizeof(recvaddr));
         if (success == -1)
         {
           perror("sendto():");
           exit(90);
         }
-
-        // break;
       }
       // when an ARP request is processed, respond
       else if (ntohs(eh.ether_type) == 0x0806)
@@ -197,18 +209,27 @@ int main()
         printf("Received Ether Source: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_shost));
         printf("Received Ether Type: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_type));
 
-        struct ether_arp arpReceived,arpResponse;
+        struct ether_arp arpReceived, arpResponse;
         memcpy(&arpReceived, &buf[14], sizeof(arpReceived));
+
+        for (int i = 0; i < sizeof(buffer); i += 54)
+        {
+          if (!strcmp(&buffer[i + 8], arpReceived.arp_tpa))
+          {
+            memcpy(&macp, &buffer[i], 46);
+          }
+        }
+        printf("Mac in ARP: %s\n", macp);
 
         arpResponse = arpReceived;
         arpResponse.ea_hdr.ar_op = htons(2);
-     
+
         // create ARP packet to the request with previous information and host MAC address
         memcpy(arpResponse.arp_tha, arpReceived.arp_sha, sizeof(arpReceived.arp_sha));
         memcpy(arpResponse.arp_tpa, arpReceived.arp_spa, sizeof(arpReceived.arp_spa));
         memcpy(arpResponse.arp_spa, arpReceived.arp_tpa, sizeof(arpReceived.arp_tpa));
         memcpy(arpResponse.arp_sha, ether_aton(macp), 6);
-        
+
         struct ether_header ehResponse;
 
         memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
@@ -224,20 +245,14 @@ int main()
         printf("Response Ether Type: %s\n\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_type));
 
         int success = send(packet_socket, temp_buf, n, 0);
-        // int success = sendto(packet_socket, temp_buf, 42, 0,
-        //                      (struct sockaddr *)&recvaddr, sizeof(recvaddr));
         if (success == -1)
         {
-          perror("sendto():");
+          perror("send():");
           exit(90);
         }
-        if (ntohs(ehResponse.ether_type) == 0x0806)
-        {
-          printf("got here\n\n");
-        }
+
         uint16_t reset = 0x0;
         memcpy(&eh.ether_type, &reset, sizeof(eh.ether_type));
-        // break;
       }
     }
     if (FD_ISSET(STDIN_FILENO, &tmp))
@@ -260,6 +275,10 @@ int main()
   return 0;
 }
 
+// Function to calculate checksum
+// We used the code from this geeks-for-geeks article
+// as the basis of our function:
+// https://www.geeksforgeeks.org/ping-in-c/
 unsigned short checksum(void *b, int len)
 {
   unsigned short *buf = b;
