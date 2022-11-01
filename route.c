@@ -159,12 +159,6 @@ int main()
     // Length of received message
     unsigned int recvaddrlen = sizeof(struct sockaddr_ll);
 
-    // TODO 3: construct a routing table????  Find an entry in
-    // the routing table, with prefix matching dest IP addr in
-    // the packet.  See TODO 4 if not found, see TODO 5 in arp if found
-
-    // TODO 4: if no such entry exists, send back an ICMP destination
-    // unreachable (network unreachable) message.
     for (int j = 0; j < 10; ++j)
     {
       // If there is a packet in this socket
@@ -178,6 +172,17 @@ int main()
         int n = recvfrom(packet_socket[j], buf, 1500, 0, (struct sockaddr *)&recvaddr, &recvaddrlen);
         // Temporary buffer to hold packet info
         char temp_buf[n];
+        // TODO 3:  Find an entry in (via the two text files)
+        // the routing table, with prefix matching dest IP addr in
+        // the packet.  I read this as, if this isn't us, then we need to
+        // forward.  So, we need to look it up.  Maybe have a bool to keep
+        // track of whether or not the ip is "us" and a function to iterate
+        // through each text file?
+
+        // See TODO 4 if not found, see TODO 5 in arp if found
+
+        // TODO 4: if no such entry exists, send back an ICMP destination
+        // unreachable (network unreachable) message.
 
         // ignore outgoing packets (we can't disable some from being sent
         // by the OS automatically, for example ICMP port unreachable
