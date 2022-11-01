@@ -172,17 +172,15 @@ int main()
         int n = recvfrom(packet_socket[j], buf, 1500, 0, (struct sockaddr *)&recvaddr, &recvaddrlen);
         // Temporary buffer to hold packet info
         char temp_buf[n];
-        // TODO 3:  Find an entry in (via the two text files)
+        // TODO 3:  Find an entry in
         // the routing table, with prefix matching dest IP addr in
         // the packet.  I read this as, if this isn't us, then we need to
         // forward.  So, we need to look it up.  Maybe have a bool to keep
-        // track of whether or not the ip is "us" and a function to iterate
-        // through each text file?
-
-        // See TODO 4 if not found, see TODO 5 in arp if found
+        // track of whether or not the ip is "us"
 
         // TODO 4: if no such entry exists, send back an ICMP destination
-        // unreachable (network unreachable) message.
+        // unreachable (network unreachable) message.  So, bools if false
+        // send ICMP
 
         // ignore outgoing packets (we can't disable some from being sent
         // by the OS automatically, for example ICMP port unreachable
@@ -193,6 +191,24 @@ int main()
         struct ether_header eh;
         eh.ether_type = ntohs(0x0000);
         memcpy(&eh, buf, 14);
+
+        // Sequence num is the ttl -- 32 hops and done.  Decrement if we hit 0, drop packet, and send ICMP time exceeded message.
+        // TODO 2: We think this is done if we are assuming that checksum and ttl
+        // are checked once we decide the packet is for us??
+        // Decrement TTL or sequence num
+        // If zero, due to this operation, send back a ICMP time exceeded (TTL exceed)
+        // message and drop the original packet.  Otherwise, you must recompute
+        // the IP checksum due to the changed TTL.
+
+        // Verify Checksum from sender, consider wrapping send function and resetting some info
+        // uint16_t temp_checksum = icmp.checksum;
+        // icmp.checksum = 0;
+        // memcpy(&buf[36], &icmp.checksum, 2);
+        // icmp.checksum = checksum(&buf[14], n - 14);
+        // printf("OG checksum %u\n", temp_checksum);
+        // printf("Our checksum %u\n", icmp.checksum);
+        // if (icmp.checksum != temp_checksum)
+        //   continue;
 
         // When the packet is an ICMP Echo Request
         if (ntohs(eh.ether_type) == 0x0800)
@@ -214,15 +230,6 @@ int main()
           // Store all of the ICMP info
           memcpy(&icmp, &buf[34], sizeof(icmp));
 
-          // Sequence num is the ttl -- 32 hops and done.  Decrement/Increment ?? if we hit 0, drop packet, and send ICMP time exceeded message.
-          // TODO 2: Decrement TTL or sequence num
-          // If zero, due to this operation, send back a ICMP time exceeded (TTL exceed)
-          // message and drop the original packet.  Otherwise, you must recompute
-          // the IP checksum due to the changed TTL.
-
-          // TODO 1: Verify Checksum from sender
-          // If incorrect drop packet; maybe utilize continue; ?
-          // Reset any other information
           // Set type and checksum to zero
           icmp.type = ntohs(0x0000);
           icmp.checksum = 0;
@@ -233,6 +240,7 @@ int main()
           memcpy(&temp_buf[34], &icmp, sizeof(icmp));
           // Data
           memcpy(&temp_buf[42], &buf[42], n - 42);
+
           // Calculate checksum
           icmp.checksum = checksum(&temp_buf[14], n - 14);
           memcpy(&temp_buf[36], &icmp.checksum, 2);
@@ -259,6 +267,10 @@ int main()
           // unreachable (host unreachable) message.  Maybe consider extracting ICMP
           // logic to function so we can call it down here.  Print out next hop IP and
           // mac addresses we obtain from the routing table and from ARP.
+
+          // TODO 5 again: while loop where we wait to receive ARP reply from IP
+          // and if no response, send ICMP.  Also, store old packet.  If reply succesful
+          // update ether header dhost (see TODO 6).
 
           // TODO 6: Using the ethernet address found through arp as the destination
           // and the ethernet address of the interface you are sending on as the source,
@@ -319,6 +331,7 @@ int main()
             perror("send():");
             exit(90);
           }
+
           // Reset all of the info for type
           uint16_t reset = 0x0;
           memcpy(&eh.ether_type, &reset, sizeof(eh.ether_type));
