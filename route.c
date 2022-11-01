@@ -158,6 +158,13 @@ int main()
     struct sockaddr_ll recvaddr;
     // Length of received message
     unsigned int recvaddrlen = sizeof(struct sockaddr_ll);
+
+    // TODO 3: construct a routing table????  Find an entry in
+    // the routing table, with prefix matching dest IP addr in
+    // the packet.  See TODO 4 if not found, see TODO 5 in arp if found
+
+    // TODO 4: if no such entry exists, send back an ICMP destination
+    // unreachable (network unreachable) message.
     for (int j = 0; j < 10; ++j)
     {
       // If there is a packet in this socket
@@ -203,6 +210,14 @@ int main()
           memcpy(&icmp, &buf[34], sizeof(icmp));
 
           // Sequence num is the ttl -- 32 hops and done.  Decrement/Increment ?? if we hit 0, drop packet, and send ICMP time exceeded message.
+          // TODO 2: Decrement TTL or sequence num
+          // If zero, due to this operation, send back a ICMP time exceeded (TTL exceed)
+          // message and drop the original packet.  Otherwise, you must recompute
+          // the IP checksum due to the changed TTL.
+
+          // TODO 1: Verify Checksum from sender
+          // If incorrect drop packet; maybe utilize continue; ?
+          // Reset any other information
           // Set type and checksum to zero
           icmp.type = ntohs(0x0000);
           icmp.checksum = 0;
@@ -211,7 +226,7 @@ int main()
           memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
           memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
           memcpy(&temp_buf[34], &icmp, sizeof(icmp));
-          // Data - size of data is hard coded, so def need to change.
+          // Data
           memcpy(&temp_buf[42], &buf[42], n - 42);
           // Calculate checksum
           icmp.checksum = checksum(&temp_buf[14], n - 14);
@@ -227,6 +242,24 @@ int main()
         // when an ARP request is processed, respond
         else if (ntohs(eh.ether_type) == 0x0806)
         {
+          // TODO 5: USING route table entry found, determine the interface
+          // and next hop IP address.  Next hop only used in ARP, we do not
+          // put this address into the packet being forwarded in any way.
+
+          // TODO 5 continued: construct an ARP request, to find the ethernet
+          // address corresponding to the next hop IP address.  Send this request
+          // out on the correct interface from the previous step, and receive the
+          // reply.  You may use a cache to bypass this step, although you are not
+          // required to.  If there is no ARP response, send back and ICMP destination
+          // unreachable (host unreachable) message.  Maybe consider extracting ICMP
+          // logic to function so we can call it down here.  Print out next hop IP and
+          // mac addresses we obtain from the routing table and from ARP.
+
+          // TODO 6: Using the ethernet address found through arp as the destination
+          // and the ethernet address of the interface you are sending on as the source,
+          // construct a new ethernet header for the packet being forwarded
+
+          // TODO 7: Send out the packet on the appropriate interface (packet_socket)
           // Place to store MAC address
           char temp_mac[INET6_ADDRSTRLEN];
           // Print statements to verify what we are receiving
