@@ -229,9 +229,10 @@ int main()
 
             iph.ttl--;
 
-            // Reenter while if bad checksum or no ttl
+            // Reenter while if bad checksum
             if (iph.check != temp_checksum)
               continue;
+            //Send Time Exceeded Message
             else if (iph.ttl == 0)
             {
               printf("Packet Timeout\n\n");
@@ -269,6 +270,7 @@ int main()
                 perror("send():");
                 exit(90);
               }
+              continue;
             }
 
             /********************* Forward pack here ***********************/
@@ -296,9 +298,9 @@ int main()
             printf("file contents 3\n%s\n", &routingTable[46]);
             printf("file contents 4\n%s\n", &routingTable[69]);
             printf("file contents 5\n%s\n", &routingTable[92]);
-          }
-int desiredSocket;
-   for (int i = 0; i < sizeof(routingTable); i += 54)
+
+            int desiredSocket;
+            for (int i = 0; i < sizeof(routingTable); i += 54)
             {
               char temp_ip[9];
               char temp_tip[INET_ADDRSTRLEN];
@@ -312,6 +314,14 @@ int desiredSocket;
               }
             }
 
+            memcpy(&buf[14], &iph, sizeof(iph));
+            int success = send(packet_socket[j], buf, n, 0);
+            if (success == -1)
+            {
+              perror("send():");
+              exit(90);
+            }
+          }
           // reply to ICMP
           else
           {
