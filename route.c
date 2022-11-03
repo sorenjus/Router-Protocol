@@ -201,55 +201,110 @@ int main()
         // the IP checksum due to the changed TTL.
 
         // Verify Checksum from sender, consider wrapping send function and resetting some info
-        // uint16_t temp_checksum = icmp.checksum;
-        // icmp.checksum = 0;
-        // memcpy(&buf[36], &icmp.checksum, 2);
-        // icmp.checksum = checksum(&buf[14], n - 14);
-        // printf("OG checksum %u\n", temp_checksum);
-        // printf("Our checksum %u\n", icmp.checksum);
-        // if (icmp.checksum != temp_checksum)
-        //   continue;
 
-        // When the packet is an ICMP Echo Request
+        // When the packet is an ICMP or IPv4
         if (ntohs(eh.ether_type) == 0x0800)
         {
-          printf("ICMP\n\n");
-          struct icmp_header icmp;
           struct iphdr iph, iphResponse;
-          struct ether_header ehResponse;
-
-          // build IP portion
           memcpy(&iph, &buf[14], sizeof(iph));
           memcpy(&iphResponse, &iph, sizeof(iph));
-          memcpy(&iphResponse.saddr, &iph.daddr, sizeof(iph.daddr));
-          memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
-          // build EH portion
-          memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
-          memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
-          memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
-          // Store all of the ICMP info
-          memcpy(&icmp, &buf[34], sizeof(icmp));
 
-          // Set type and checksum to zero
-          icmp.type = ntohs(0x0000);
-          icmp.checksum = 0;
-
-          // Add everything to the message to send
-          memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
-          memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
-          memcpy(&temp_buf[34], &icmp, sizeof(icmp));
-          // Data
-          memcpy(&temp_buf[42], &buf[42], n - 42);
-
-          // Calculate checksum
-          icmp.checksum = checksum(&temp_buf[14], n - 14);
-          memcpy(&temp_buf[36], &icmp.checksum, 2);
-          // Send ICMP Echo Reply
-          int success = send(packet_socket[j], temp_buf, n, 0);
-          if (success == -1)
+          // Forward packet
+          if (iph.protocol != 1)
           {
-            perror("send():");
-            exit(90);
+            uint16_t temp_checksum = iph.check;
+            iph.check = 0;
+            memcpy(&buf[36], &iph.check, 2);
+            iph.check = checksum(&buf[14], n - 14);
+            printf("OG checksum %u\n", temp_checksum);
+            printf("Our checksum %u\n", iph.check);
+
+            iph.ttl--;
+
+            // Reenter while if bad checksum or no ttl
+            if (iph.check != temp_checksum)
+              continue;
+            else if (iph.ttl == 0)
+            {
+              printf("Packet Timeout\n\n");
+              struct icmp_header icmp;
+              struct ether_header ehResponse;
+
+              // build IP portion
+              memcpy(&iphResponse.saddr, &iph.daddr, sizeof(iph.daddr));
+              memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
+              // build EH portion
+              memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
+              memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
+              memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
+              // Store all of the ICMP info
+              memcpy(&icmp, &buf[34], sizeof(icmp));
+
+              // Set type and checksum to zero
+              icmp.type = ntohs(0x0008);
+              icmp.checksum = 0;
+
+              // Add everything to the message to send
+              memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
+              memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
+              memcpy(&temp_buf[34], &icmp, sizeof(icmp));
+              // Data
+              memcpy(&temp_buf[42], &buf[42], n - 42);
+
+              // Calculate checksum
+              icmp.checksum = checksum(&temp_buf[14], n - 14);
+              memcpy(&temp_buf[36], &icmp.checksum, 2);
+              // Send ICMP Echo Reply
+              int success = send(packet_socket[j], temp_buf, n, 0);
+              if (success == -1)
+              {
+                perror("send():");
+                exit(90);
+              }
+            }
+
+            /********************* Forward pack here ***********************/
+
+
+          }
+          // reply to ICMP
+          else
+          {
+            printf("ICMP\n\n");
+            struct icmp_header icmp;
+            struct ether_header ehResponse;
+
+            // build IP portion
+            memcpy(&iphResponse.saddr, &iph.daddr, sizeof(iph.daddr));
+            memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
+            // build EH portion
+            memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
+            memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
+            memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
+            // Store all of the ICMP info
+            memcpy(&icmp, &buf[34], sizeof(icmp));
+
+            // Set type and checksum to zero
+            icmp.type = ntohs(0x0000);
+            icmp.checksum = 0;
+
+            // Add everything to the message to send
+            memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
+            memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
+            memcpy(&temp_buf[34], &icmp, sizeof(icmp));
+            // Data
+            memcpy(&temp_buf[42], &buf[42], n - 42);
+
+            // Calculate checksum
+            icmp.checksum = checksum(&temp_buf[14], n - 14);
+            memcpy(&temp_buf[36], &icmp.checksum, 2);
+            // Send ICMP Echo Reply
+            int success = send(packet_socket[j], temp_buf, n, 0);
+            if (success == -1)
+            {
+              perror("send():");
+              exit(90);
+            }
           }
         }
         // when an ARP request is processed, respond
