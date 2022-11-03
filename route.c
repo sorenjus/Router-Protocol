@@ -58,6 +58,9 @@ int main()
   int counter = 0;
   // Buffer to hold MAC and associated IP
   char buffer[1024];
+  // Holds the routing table information read in from the txt file
+  char temp_name[2] = "";
+  char routingTable[1024];
   // For adding packet_socket elements
   int index = 0;
   // get list of interface addresses. This is a linked list. Next
@@ -138,95 +141,164 @@ int main()
       FD_SET(STDIN_FILENO, &myfds);
       // Prepare for the next socket
       index++;
+
+      if (!strncmp(&(tmp->ifa_name[3]), "eth1", 4))
+      {
+        memcpy(temp_name, tmp->ifa_name, 2);
+        printf("Interface name : %s\n", temp_name);
+      }
     }
   }
-
-  // loop and recieve packets. We are only looking at one interface,
-  // for the project you will probably want to look at more (to do so,
-  // a good way is to have one socket per interface and use select to
-  // see which ones have data) *** look at udpselect.c line 20 - 26
-  printf("Ready to recieve now\n");
-  while (1)
+  char *fileName = "-table.txt";
+  strcat(temp_name, fileName);
+  printf("file name: %s\n", temp_name);
+  FILE *file;
+  file = fopen(temp_name, "r+");
+  printf("file open\n");
+  // if the file is Null return the error message, exit, and notify the client
+  if (file == NULL)
   {
-    // Place to hold packet we receive
-    char buf[1500];
-    // Temp file descriptor
-    fd_set fdstmp = myfds;
-    // Wait for an actual message
-    int nn = select(FD_SETSIZE, &fdstmp, NULL, NULL, NULL);
-    // Struct to receive message
-    struct sockaddr_ll recvaddr;
-    // Length of received message
-    unsigned int recvaddrlen = sizeof(struct sockaddr_ll);
+    printf("Error! Could not open file\n");
+    exit(-1);
+  }
+  int fileCounter = 0;
+  do
+  {
+    fgets(&routingTable[fileCounter], 54, file);
+    fileCounter += 54;
+    } while (!feof(file));
 
-    for (int j = 0; j < 10; ++j)
+    printf("file contents 1\n%s\n", routingTable);
+    printf("file contents 2\n%s", &routingTable[12]);
+
+    // loop and recieve packets. We are only looking at one interface,
+    // for the project you will probably want to look at more (to do so,
+    // a good way is to have one socket per interface and use select to
+    // see which ones have data) *** look at udpselect.c line 20 - 26
+    printf("Ready to recieve now\n");
+    while (1)
     {
-      // If there is a packet in this socket
-      if (FD_ISSET(packet_socket[j], &fdstmp))
+      // Place to hold packet we receive
+      char buf[1500];
+      // Temp file descriptor
+      fd_set fdstmp = myfds;
+      // Wait for an actual message
+      int nn = select(FD_SETSIZE, &fdstmp, NULL, NULL, NULL);
+      // Struct to receive message
+      struct sockaddr_ll recvaddr;
+      // Length of received message
+      unsigned int recvaddrlen = sizeof(struct sockaddr_ll);
+
+      for (int j = 0; j < 10; ++j)
       {
-        // we can use recv, since the addresses are in the packet, but we
-        // use recvfrom because it gives us an easy way to determine if
-        // this packet is incoming or outgoing (when using ETH_P_ALL, we
-        // see packets in both directions. Only outgoing can be seen when
-        // using a packet socket with some specific protocol)
-        int n = recvfrom(packet_socket[j], buf, 1500, 0, (struct sockaddr *)&recvaddr, &recvaddrlen);
-        // Temporary buffer to hold packet info
-        char temp_buf[n];
-        // TODO 3:  Find an entry in
-        // the routing table, with prefix matching dest IP addr in
-        // the packet.  I read this as, if this isn't us, then we need to
-        // forward.  So, we need to look it up.  Maybe have a bool to keep
-        // track of whether or not the ip is "us"
-
-        // TODO 4: if no such entry exists, send back an ICMP destination
-        // unreachable (network unreachable) message.  So, bools if false
-        // send ICMP
-
-        // ignore outgoing packets (we can't disable some from being sent
-        // by the OS automatically, for example ICMP port unreachable
-        // messages, so we will just ignore them here)
-        if (recvaddr.sll_pkttype == PACKET_OUTGOING)
-          continue;
-        // start processing all others
-        struct ether_header eh;
-        eh.ether_type = ntohs(0x0000);
-        memcpy(&eh, buf, 14);
-
-        // Sequence num is the ttl -- 32 hops and done.  Decrement if we hit 0, drop packet, and send ICMP time exceeded message.
-        // TODO 2: We think this is done if we are assuming that checksum and ttl
-        // are checked once we decide the packet is for us??
-        // Decrement TTL or sequence num
-        // If zero, due to this operation, send back a ICMP time exceeded (TTL exceed)
-        // message and drop the original packet.  Otherwise, you must recompute
-        // the IP checksum due to the changed TTL.
-
-        // Verify Checksum from sender, consider wrapping send function and resetting some info
-
-        // When the packet is an ICMP or IPv4
-        if (ntohs(eh.ether_type) == 0x0800)
+        // If there is a packet in this socket
+        if (FD_ISSET(packet_socket[j], &fdstmp))
         {
-          struct iphdr iph, iphResponse;
-          memcpy(&iph, &buf[14], sizeof(iph));
-          memcpy(&iphResponse, &iph, sizeof(iph));
+          // we can use recv, since the addresses are in the packet, but we
+          // use recvfrom because it gives us an easy way to determine if
+          // this packet is incoming or outgoing (when using ETH_P_ALL, we
+          // see packets in both directions. Only outgoing can be seen when
+          // using a packet socket with some specific protocol)
+          int n = recvfrom(packet_socket[j], buf, 1500, 0, (struct sockaddr *)&recvaddr, &recvaddrlen);
+          // Temporary buffer to hold packet info
+          char temp_buf[n];
+          // TODO 3:  Find an entry in
+          // the routing table, with prefix matching dest IP addr in
+          // the packet.  I read this as, if this isn't us, then we need to
+          // forward.  So, we need to look it up.  Maybe have a bool to keep
+          // track of whether or not the ip is "us"
 
-          // Forward packet
-          if (iph.protocol != 1)
+          // TODO 4: if no such entry exists, send back an ICMP destination
+          // unreachable (network unreachable) message.  So, bools if false
+          // send ICMP
+
+          // ignore outgoing packets (we can't disable some from being sent
+          // by the OS automatically, for example ICMP port unreachable
+          // messages, so we will just ignore them here)
+          if (recvaddr.sll_pkttype == PACKET_OUTGOING)
+            continue;
+          // start processing all others
+          struct ether_header eh;
+          eh.ether_type = ntohs(0x0000);
+          memcpy(&eh, buf, 14);
+
+          // Sequence num is the ttl -- 32 hops and done.  Decrement if we hit 0, drop packet, and send ICMP time exceeded message.
+          // TODO 2: We think this is done if we are assuming that checksum and ttl
+          // are checked once we decide the packet is for us??
+          // Decrement TTL or sequence num
+          // If zero, due to this operation, send back a ICMP time exceeded (TTL exceed)
+          // message and drop the original packet.  Otherwise, you must recompute
+          // the IP checksum due to the changed TTL.
+
+          // Verify Checksum from sender, consider wrapping send function and resetting some info
+
+          // When the packet is an ICMP or IPv4
+          if (ntohs(eh.ether_type) == 0x0800)
           {
-            uint16_t temp_checksum = iph.check;
-            iph.check = 0;
-            memcpy(&buf[36], &iph.check, 2);
-            iph.check = checksum(&buf[14], n - 14);
-            printf("OG checksum %u\n", temp_checksum);
-            printf("Our checksum %u\n", iph.check);
+            struct iphdr iph, iphResponse;
+            memcpy(&iph, &buf[14], sizeof(iph));
+            memcpy(&iphResponse, &iph, sizeof(iph));
 
-            iph.ttl--;
-
-            // Reenter while if bad checksum or no ttl
-            if (iph.check != temp_checksum)
-              continue;
-            else if (iph.ttl == 0)
+            // Forward packet
+            if (iph.protocol != 1)
             {
-              printf("Packet Timeout\n\n");
+              uint16_t temp_checksum = iph.check;
+              iph.check = 0;
+              memcpy(&buf[36], &iph.check, 2);
+              iph.check = checksum(&buf[14], n - 14);
+              printf("OG checksum %u\n", temp_checksum);
+              printf("Our checksum %u\n", iph.check);
+
+              iph.ttl--;
+
+              // Reenter while if bad checksum or no ttl
+              if (iph.check != temp_checksum)
+                continue;
+              else if (iph.ttl == 0)
+              {
+                printf("Packet Timeout\n\n");
+                struct icmp_header icmp;
+                struct ether_header ehResponse;
+
+                // build IP portion
+                memcpy(&iphResponse.saddr, &iph.daddr, sizeof(iph.daddr));
+                memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
+                // build EH portion
+                memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
+                memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
+                memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
+                // Store all of the ICMP info
+                memcpy(&icmp, &buf[34], sizeof(icmp));
+
+                // Set type and checksum to zero
+                icmp.type = ntohs(0x0008);
+                icmp.checksum = 0;
+
+                // Add everything to the message to send
+                memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
+                memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
+                memcpy(&temp_buf[34], &icmp, sizeof(icmp));
+                // Data
+                memcpy(&temp_buf[42], &buf[42], n - 42);
+
+                // Calculate checksum
+                icmp.checksum = checksum(&temp_buf[14], n - 14);
+                memcpy(&temp_buf[36], &icmp.checksum, 2);
+                // Send ICMP Echo Reply
+                int success = send(packet_socket[j], temp_buf, n, 0);
+                if (success == -1)
+                {
+                  perror("send():");
+                  exit(90);
+                }
+              }
+
+              /********************* Forward pack here ***********************/
+            }
+            // reply to ICMP
+            else
+            {
+              printf("ICMP\n\n");
               struct icmp_header icmp;
               struct ether_header ehResponse;
 
@@ -241,7 +313,7 @@ int main()
               memcpy(&icmp, &buf[34], sizeof(icmp));
 
               // Set type and checksum to zero
-              icmp.type = ntohs(0x0008);
+              icmp.type = ntohs(0x0000);
               icmp.checksum = 0;
 
               // Add everything to the message to send
@@ -262,175 +334,131 @@ int main()
                 exit(90);
               }
             }
-
-            /********************* Forward pack here ***********************/
-
-
           }
-          // reply to ICMP
-          else
+          // when an ARP request is processed, respond
+          else if (ntohs(eh.ether_type) == 0x0806)
           {
-            printf("ICMP\n\n");
-            struct icmp_header icmp;
+            // TODO 5: USING route table entry found, determine the interface
+            // and next hop IP address.  Next hop only used in ARP, we do not
+            // put this address into the packet being forwarded in any way.
+
+            // TODO 5 continued: construct an ARP request, to find the ethernet
+            // address corresponding to the next hop IP address.  Send this request
+            // out on the correct interface from the previous step, and receive the
+            // reply.  You may use a cache to bypass this step, although you are not
+            // required to.  If there is no ARP response, send back and ICMP destination
+            // unreachable (host unreachable) message.  Maybe consider extracting ICMP
+            // logic to function so we can call it down here.  Print out next hop IP and
+            // mac addresses we obtain from the routing table and from ARP.
+
+            // TODO 5 again: while loop where we wait to receive ARP reply from IP
+            // and if no response, send ICMP.  Also, store old packet.  If reply succesful
+            // update ether header dhost (see TODO 6).
+
+            // TODO 6: Using the ethernet address found through arp as the destination
+            // and the ethernet address of the interface you are sending on as the source,
+            // construct a new ethernet header for the packet being forwarded
+
+            // TODO 7: Send out the packet on the appropriate interface (packet_socket)
+            // Place to store MAC address
+            char temp_mac[INET6_ADDRSTRLEN];
+            // Print statements to verify what we are receiving
+            printf("Packet socket in ARP Request: %d\n\n", packet_socket[j]);
+            printf("Received Ether Destination: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_dhost));
+            printf("Received Ether Source: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_shost));
+            printf("Received Ether Type: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_type));
+            // Structs to hold our ARP ether information
+            struct ether_arp arpReceived, arpResponse;
+            memcpy(&arpReceived, &buf[14], sizeof(arpReceived));
+
+            // Find the right MAC address associated with IP
+            for (int i = 0; i < sizeof(buffer); i += 54)
+            {
+              char temp_ip[9];
+              char temp_tip[INET_ADDRSTRLEN];
+              strncpy(temp_ip, &buffer[i + 46], 8);
+              inet_ntop(AF_INET, &(arpReceived.arp_tpa), temp_tip, INET_ADDRSTRLEN);
+              if (!strcmp(temp_ip, temp_tip))
+              {
+                memcpy(&temp_mac, &buffer[i], 46);
+                break;
+              }
+            }
+            printf("Mac in ARP: %s\n", temp_mac);
+            // Set ARP response to received and change op code to 2
+            arpResponse = arpReceived;
+            arpResponse.ea_hdr.ar_op = htons(2);
+
+            // create ARP packet to the request with previous information and host MAC address
+            memcpy(arpResponse.arp_tha, arpReceived.arp_sha, sizeof(arpReceived.arp_sha));
+            memcpy(arpResponse.arp_tpa, arpReceived.arp_spa, sizeof(arpReceived.arp_spa));
+            memcpy(arpResponse.arp_spa, arpReceived.arp_tpa, sizeof(arpReceived.arp_tpa));
+            memcpy(arpResponse.arp_sha, ether_aton(temp_mac), 6);
+
+            // Set up ether header
             struct ether_header ehResponse;
-
-            // build IP portion
-            memcpy(&iphResponse.saddr, &iph.daddr, sizeof(iph.daddr));
-            memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
-            // build EH portion
             memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
-            memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
+            memcpy(ehResponse.ether_shost, arpResponse.arp_sha, 6);
             memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
-            // Store all of the ICMP info
-            memcpy(&icmp, &buf[34], sizeof(icmp));
-
-            // Set type and checksum to zero
-            icmp.type = ntohs(0x0000);
-            icmp.checksum = 0;
-
-            // Add everything to the message to send
-            memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
-            memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
-            memcpy(&temp_buf[34], &icmp, sizeof(icmp));
-            // Data
-            memcpy(&temp_buf[42], &buf[42], n - 42);
-
-            // Calculate checksum
-            icmp.checksum = checksum(&temp_buf[14], n - 14);
-            memcpy(&temp_buf[36], &icmp.checksum, 2);
-            // Send ICMP Echo Reply
+            // Store everything in the buffer
+            memcpy(&temp_buf[0], &ehResponse, sizeof(ehResponse));
+            memcpy(&temp_buf[14], &arpResponse, sizeof(arpResponse));
+            // Print statements to verify ether header info
+            printf("Response Ether Destination: %s\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_dhost));
+            printf("Response Ether Source: %s\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_shost));
+            printf("Response Ether Type: %s\n\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_type));
+            // Send ARP Reply
             int success = send(packet_socket[j], temp_buf, n, 0);
             if (success == -1)
             {
               perror("send():");
               exit(90);
             }
+
+            // Reset all of the info for type
+            uint16_t reset = 0x0;
+            memcpy(&eh.ether_type, &reset, sizeof(eh.ether_type));
           }
         }
-        // when an ARP request is processed, respond
-        else if (ntohs(eh.ether_type) == 0x0806)
+        if (FD_ISSET(STDIN_FILENO, &fdstmp))
         {
-          // TODO 5: USING route table entry found, determine the interface
-          // and next hop IP address.  Next hop only used in ARP, we do not
-          // put this address into the packet being forwarded in any way.
-
-          // TODO 5 continued: construct an ARP request, to find the ethernet
-          // address corresponding to the next hop IP address.  Send this request
-          // out on the correct interface from the previous step, and receive the
-          // reply.  You may use a cache to bypass this step, although you are not
-          // required to.  If there is no ARP response, send back and ICMP destination
-          // unreachable (host unreachable) message.  Maybe consider extracting ICMP
-          // logic to function so we can call it down here.  Print out next hop IP and
-          // mac addresses we obtain from the routing table and from ARP.
-
-          // TODO 5 again: while loop where we wait to receive ARP reply from IP
-          // and if no response, send ICMP.  Also, store old packet.  If reply succesful
-          // update ether header dhost (see TODO 6).
-
-          // TODO 6: Using the ethernet address found through arp as the destination
-          // and the ethernet address of the interface you are sending on as the source,
-          // construct a new ethernet header for the packet being forwarded
-
-          // TODO 7: Send out the packet on the appropriate interface (packet_socket)
-          // Place to store MAC address
-          char temp_mac[INET6_ADDRSTRLEN];
-          // Print statements to verify what we are receiving
-          printf("Packet socket in ARP Request: %d\n\n", packet_socket[j]);
-          printf("Received Ether Destination: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_dhost));
-          printf("Received Ether Source: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_shost));
-          printf("Received Ether Type: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_type));
-          // Structs to hold our ARP ether information
-          struct ether_arp arpReceived, arpResponse;
-          memcpy(&arpReceived, &buf[14], sizeof(arpReceived));
-
-          // Find the right MAC address associated with IP
-          for (int i = 0; i < sizeof(buffer); i += 54)
-          {
-            char temp_ip[9];
-            char temp_tip[INET_ADDRSTRLEN];
-            strncpy(temp_ip, &buffer[i + 46], 8);
-            inet_ntop(AF_INET, &(arpReceived.arp_tpa), temp_tip, INET_ADDRSTRLEN);
-            if (!strcmp(temp_ip, temp_tip))
-            {
-              memcpy(&temp_mac, &buffer[i], 46);
-              break;
-            }
-          }
-          printf("Mac in ARP: %s\n", temp_mac);
-          // Set ARP response to received and change op code to 2
-          arpResponse = arpReceived;
-          arpResponse.ea_hdr.ar_op = htons(2);
-
-          // create ARP packet to the request with previous information and host MAC address
-          memcpy(arpResponse.arp_tha, arpReceived.arp_sha, sizeof(arpReceived.arp_sha));
-          memcpy(arpResponse.arp_tpa, arpReceived.arp_spa, sizeof(arpReceived.arp_spa));
-          memcpy(arpResponse.arp_spa, arpReceived.arp_tpa, sizeof(arpReceived.arp_tpa));
-          memcpy(arpResponse.arp_sha, ether_aton(temp_mac), 6);
-
-          // Set up ether header
-          struct ether_header ehResponse;
-          memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
-          memcpy(ehResponse.ether_shost, arpResponse.arp_sha, 6);
-          memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
-          // Store everything in the buffer
-          memcpy(&temp_buf[0], &ehResponse, sizeof(ehResponse));
-          memcpy(&temp_buf[14], &arpResponse, sizeof(arpResponse));
-          // Print statements to verify ether header info
-          printf("Response Ether Destination: %s\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_dhost));
-          printf("Response Ether Source: %s\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_shost));
-          printf("Response Ether Type: %s\n\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_type));
-          // Send ARP Reply
-          int success = send(packet_socket[j], temp_buf, n, 0);
-          if (success == -1)
-          {
-            perror("send():");
-            exit(90);
-          }
-
-          // Reset all of the info for type
-          uint16_t reset = 0x0;
-          memcpy(&eh.ether_type, &reset, sizeof(eh.ether_type));
+          printf("The user typed something, I better do something with it\n");
+          char buf[5000];
+          fgets(buf, 5000, stdin);
+          printf("You typed %s\n", buf);
         }
       }
-      if (FD_ISSET(STDIN_FILENO, &fdstmp))
-      {
-        printf("The user typed something, I better do something with it\n");
-        char buf[5000];
-        fgets(buf, 5000, stdin);
-        printf("You typed %s\n", buf);
-      }
+      // what else to do is up to you, you can send packets with send,
+      // just like we used for TCP sockets (or you can use sendto, but it
+      // is not necessary, since the headers, including all addresses,
+      // need to be in the buffer you are sending)
     }
-    // what else to do is up to you, you can send packets with send,
-    // just like we used for TCP sockets (or you can use sendto, but it
-    // is not necessary, since the headers, including all addresses,
-    // need to be in the buffer you are sending)
+    // free the interface list when we don't need it anymore
+    freeifaddrs(ifaddr);
+    freeifaddrs(tmp);
+    for (int j = 0; j < 10; ++j)
+      close(packet_socket[j]);
+
+    // exit
+    return 0;
   }
-  // free the interface list when we don't need it anymore
-  freeifaddrs(ifaddr);
-  freeifaddrs(tmp);
-  for (int j = 0; j < 10; ++j)
-    close(packet_socket[j]);
 
-  // exit
-  return 0;
-}
+  // Function to calculate checksum
+  // We used the code from this geeks-for-geeks article
+  // as the basis of our function:
+  // https://www.geeksforgeeks.org/ping-in-c/
+  unsigned short checksum(void *b, int len)
+  {
+    unsigned short *buf = b;
+    unsigned int sum = 0;
+    unsigned short result;
 
-// Function to calculate checksum
-// We used the code from this geeks-for-geeks article
-// as the basis of our function:
-// https://www.geeksforgeeks.org/ping-in-c/
-unsigned short checksum(void *b, int len)
-{
-  unsigned short *buf = b;
-  unsigned int sum = 0;
-  unsigned short result;
-
-  for (sum = 0; len > 1; len -= 2)
-    sum += *buf++;
-  if (len == 1)
-    sum += *(unsigned char *)buf;
-  sum = (sum >> 16) + (sum & 0xFFFF);
-  sum += (sum >> 16);
-  result = ~sum;
-  return result;
-}
+    for (sum = 0; len > 1; len -= 2)
+      sum += *buf++;
+    if (len == 1)
+      sum += *(unsigned char *)buf;
+    sum = (sum >> 16) + (sum & 0xFFFF);
+    sum += (sum >> 16);
+    result = ~sum;
+    return result;
+  }
