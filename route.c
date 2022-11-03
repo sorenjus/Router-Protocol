@@ -164,12 +164,17 @@ int main()
   int fileCounter = 0;
   do
   {
-    fgets(&routingTable[fileCounter], 54, file);
-    fileCounter += 54;
+    fgets(&routingTable[fileCounter], 23, file);
+    fileCounter += 23;
     } while (!feof(file));
 
     printf("file contents 1\n%s\n", routingTable);
-    printf("file contents 2\n%s", &routingTable[12]);
+    printf("file contents 2\n%s\n", &routingTable[23]);
+    printf("file contents 3\n%s\n", &routingTable[46]);
+    printf("file contents 4\n%s\n", &routingTable[69]);
+    if(!strncmp(&temp_name[1], "2", 1)){
+    printf("file contents 5\n%s\n", &routingTable[92]);
+    }
 
     // loop and recieve packets. We are only looking at one interface,
     // for the project you will probably want to look at more (to do so,
