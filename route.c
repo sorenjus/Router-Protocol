@@ -59,7 +59,7 @@ int main()
   // Buffer to hold MAC and associated IP
   char routerAddress[1024];
   // Holds the routing table information read in from the txt file
-  char temp_name[2] = "";
+  char device_name[2] = "";
   char routingTable[1024];
   struct ether_header eh, ehResponse, ehRequest;
   struct sockaddr_ll *s;
@@ -157,8 +157,8 @@ int main()
 
       if (!strncmp(&(tmp->ifa_name[3]), "eth1", 4))
       {
-        memcpy(temp_name, tmp->ifa_name, 2);
-        printf("Interface name : %s\n", temp_name);
+        memcpy(device_name, tmp->ifa_name, 2);
+        printf("Interface name : %s\n", device_name);
       }
     }
   }
@@ -285,10 +285,10 @@ int main()
 
             /********************* Forward pack here ***********************/
             char *fileName = "-table.txt";
-            strcat(temp_name, fileName);
-            printf("file name: %s\n", temp_name);
+            strcat(&device_name[2], fileName);
+            printf("file name: %s\n", device_name);
             FILE *file;
-            file = fopen(temp_name, "r+");
+            file = fopen(device_name, "r+");
             printf("file open\n");
             // if the file is Null return the error message, exit, and notify the client
             if (file == NULL)
