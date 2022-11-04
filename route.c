@@ -59,7 +59,7 @@ int main()
   // Buffer to hold MAC and associated IP
   char routerAddress[1024];
   // Holds the routing table information read in from the txt file
-  char device_name[2] = "";
+  char device_name[3] = "";
   char routingTable[1024];
   struct ether_header eh, ehResponse, ehRequest;
   struct sockaddr_ll *s;
@@ -71,6 +71,8 @@ int main()
   struct ether_arp arpReceived, arpResponse, arpRequest;
   // For adding packet_socket elements
   int index = 0;
+  char ipAddress[100];
+  int ipCounter = 0;
   struct timeval timeout;
   timeout.tv_sec = 5;
   timeout.tv_usec = 0;
@@ -133,6 +135,8 @@ int main()
       ioctl(packet_socket[index], SIOCGIFADDR, &ifr);
       ip = inet_ntoa(((struct sockaddr_in *)&ifr.ifr_ifru.ifru_addr)->sin_addr);
       printf("Ip: %s\n", ip);
+      ipAddress[ipCounter] = *ip;
+      ipCounter+= 8;
       memcpy(&routerAddress[counter], ip, sizeof(ip));
       counter += 8;
 
@@ -285,6 +289,12 @@ int main()
 
             /********************* Forward pack here ***********************/
             char *fileName = "-table.txt";
+            if(strstr("r1", device_name)){
+              strcpy(device_name, "r1");
+            }
+            else{
+              strcpy(device_name, "r2");
+            }
             strcat(&device_name[2], fileName);
             printf("file name: %s\n", device_name);
             FILE *file;
@@ -310,16 +320,24 @@ int main()
             printf("file contents 5\n%s\n", &routingTable[92]);
 
             int desiredSocket = -1;
-            for (int i = 0; i < sizeof(routingTable); i += 23)
+            for (int i = 0; i < 130; i += 23)
             {
-              char temp_ip[9];
+              char temp_ip[INET_ADDRSTRLEN];
               char temp_tip[INET_ADDRSTRLEN];
               strncpy(temp_ip, &routingTable[i + 23], 8);
               inet_ntop(AF_INET, &(iph.daddr), temp_tip, INET_ADDRSTRLEN);
-              strcpy(&temp_tip[8], "0");
+              strcpy(&temp_tip[7], "0");
+              strcpy(&temp_ip[7], "0");
+              printf("temp tip : %s\n", temp_tip);
+              printf("temp ip : %s\n", temp_ip);
+              
+              
+              
               if (!strcmp(temp_ip, temp_tip))
               {
+                printf("match found");
                 desiredSocket = i;
+                printf("socket assigned");
                 break;
               }
             }
@@ -363,6 +381,7 @@ int main()
               }
               continue;
             }
+            printf("buffer cached");
             // Set Source IP and build an ARP Response
             char buffCache[1500];
             memcpy(&buffCache, buf, sizeof(buf));
