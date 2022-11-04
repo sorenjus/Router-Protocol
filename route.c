@@ -61,6 +61,15 @@ int main()
   // Holds the routing table information read in from the txt file
   char temp_name[2] = "";
   char routingTable[1024];
+    struct ether_header ehResponse;
+    struct sockaddr_ll *s;
+    struct ether_header eh;
+  struct iphdr iph, iphResponse;
+  struct icmp_header icmp;
+  // Place to store MAC address
+  char temp_mac[INET6_ADDRSTRLEN];
+  // Structs to hold our ARP ether information
+  struct ether_arp arpReceived, arpResponse;
   // For adding packet_socket elements
   int index = 0;
   // get list of interface addresses. This is a linked list. Next
@@ -101,7 +110,7 @@ int main()
         return 2;
       }
       // Place to store MAC address
-      struct sockaddr_ll *s = (struct sockaddr_ll *)(tmp->ifa_addr);
+      s = (struct sockaddr_ll *)(tmp->ifa_addr);
       int i;
       int len = 0;
       // Change MAC to a string
@@ -196,7 +205,6 @@ int main()
         if (recvaddr.sll_pkttype == PACKET_OUTGOING)
           continue;
         // start processing all others
-        struct ether_header eh;
         eh.ether_type = ntohs(0x0000);
         memcpy(&eh, buf, 14);
 
@@ -213,7 +221,6 @@ int main()
         // When the packet is an ICMP or IPv4
         if (ntohs(eh.ether_type) == 0x0800)
         {
-          struct iphdr iph, iphResponse;
           memcpy(&iph, &buf[14], sizeof(iph));
           memcpy(&iphResponse, &iph, sizeof(iph));
 
@@ -236,9 +243,6 @@ int main()
             else if (iph.ttl == 0)
             {
               printf("Packet Timeout\n\n");
-              struct icmp_header icmp;
-              struct ether_header ehResponse;
-
               // build IP portion
               memcpy(&iphResponse.saddr, &iph.daddr, sizeof(iph.daddr)); /*change to be our IP address*/
               memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
@@ -319,8 +323,6 @@ int main()
             {
               // Create ICMP Destination Unreachable
               printf("Network Unreachable packet\n\n");
-              struct icmp_header icmp;
-              struct ether_header ehResponse;
 
               // build IP portion
               memcpy(&iphResponse.saddr, &iph.daddr, sizeof(iph.daddr)); /*change to be our IP address*/
@@ -369,8 +371,6 @@ int main()
           else
           {
             printf("ICMP\n\n");
-            struct icmp_header icmp;
-            struct ether_header ehResponse;
 
             // build IP portion
             memcpy(&iphResponse.saddr, &iph.daddr, sizeof(iph.daddr));
@@ -430,15 +430,13 @@ int main()
           // construct a new ethernet header for the packet being forwarded
 
           // TODO 7: Send out the packet on the appropriate interface (packet_socket)
-          // Place to store MAC address
-          char temp_mac[INET6_ADDRSTRLEN];
+            
           // Print statements to verify what we are receiving
           printf("Packet socket in ARP Request: %d\n\n", packet_socket[j]);
           printf("Received Ether Destination: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_dhost));
           printf("Received Ether Source: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_shost));
           printf("Received Ether Type: %s\n", ether_ntoa((struct ether_addr *)&eh.ether_type));
-          // Structs to hold our ARP ether information
-          struct ether_arp arpReceived, arpResponse;
+            
           memcpy(&arpReceived, &buf[14], sizeof(arpReceived));
 
           // Find the right MAC address associated with IP
@@ -466,7 +464,6 @@ int main()
           memcpy(arpResponse.arp_sha, ether_aton(temp_mac), 6);
 
           // Set up ether header
-          struct ether_header ehResponse;
           memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
           memcpy(ehResponse.ether_shost, arpResponse.arp_sha, 6);
           memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
