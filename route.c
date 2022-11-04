@@ -233,15 +233,15 @@ int main()
           {
             uint16_t temp_checksum = iph.check;
             iph.check = 0;
-            memcpy(&buf[24], &iph.check, 2);
-            iph.check = checksum(&buf[14], n - 14);
-            printf("OG checksum %u\n", temp_checksum);
-            printf("Our checksum %u\n", iph.check);
-
+            memcpy(&buf[14], &iph, sizeof(iph));
+            iph.check = checksum(&buf[14], sizeof(iph));
+            printf("OG checksum %u\n", ntohs(temp_checksum));
+            printf("Our checksum %u\n", ntohs(iph.check));
+            printf("Tot len %u\n", ntohs(iph.tot_len));
             iph.ttl--;
 
             // Reenter while if bad checksum
-            if (iph.check != temp_checksum)
+            if (ntohs(iph.check) != ntohs(temp_checksum))
               continue;
             // Send Time Exceeded Message
             else if (iph.ttl == 0)
