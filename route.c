@@ -222,7 +222,7 @@ int main()
           {
             uint16_t temp_checksum = iph.check;
             iph.check = 0;
-            memcpy(&buf[36], &iph.check, 2);
+            memcpy(&buf[24], &iph.check, 2);
             iph.check = checksum(&buf[14], n - 14);
             printf("OG checksum %u\n", temp_checksum);
             printf("Our checksum %u\n", iph.check);
@@ -240,19 +240,20 @@ int main()
               struct ether_header ehResponse;
 
               // build IP portion
-              memcpy(&iphResponse.saddr, &iph.daddr, sizeof(iph.daddr));
-              memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
+              memcpy(&iphResponse.saddr, &iph.daddr, sizeof(iph.daddr));/*change to be our IP address*/
+              memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr)); 
               // build EH portion
               memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
-              memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
+              memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost)); /*change to be our MAC address*/
               memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
               // Store all of the ICMP info
               memcpy(&icmp, &buf[34], sizeof(icmp));
 
               // Set type and checksum to zero
-              icmp.type = ntohs(0x0008);
+              icmp.type = 8);
               icmp.checksum = 0;
-
+              
+              iphResponse.ttl = 32;
               // Add everything to the message to send
               memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
               memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
@@ -300,7 +301,7 @@ int main()
             printf("file contents 5\n%s\n", &routingTable[92]);
 
             int desiredSocket;
-            for (int i = 0; i < sizeof(routingTable); i += 54)
+            for (int i = 0; i < sizeof(routingTable); i += 23)
             {
               char temp_ip[9];
               char temp_tip[INET_ADDRSTRLEN];
