@@ -61,15 +61,14 @@ int main()
   // Holds the routing table information read in from the txt file
   char temp_name[2] = "";
   char routingTable[1024];
-    struct ether_header ehResponse;
+    struct ether_header eh, ehResponse;
     struct sockaddr_ll *s;
-    struct ether_header eh;
   struct iphdr iph, iphResponse;
   struct icmp_header icmp;
   // Place to store MAC address
   char temp_mac[INET6_ADDRSTRLEN];
   // Structs to hold our ARP ether information
-  struct ether_arp arpReceived, arpResponse;
+  struct ether_arp arpReceived, arpResponse, arpRequest;
   // For adding packet_socket elements
   int index = 0;
   // get list of interface addresses. This is a linked list. Next
@@ -358,13 +357,12 @@ int main()
                 exit(90);
               }
               continue;
-                        }
-            memcpy(&buf[14], &iph, sizeof(iph));
-            int success = send(packet_socket[j], buf, n, 0);
-            if (success == -1)
-            {
-              perror("send():");
-              exit(90);
+            }
+              
+               */
+              //found the network to send an ARP Request
+            else{
+                
             }
           }
           // reply to ICMP
