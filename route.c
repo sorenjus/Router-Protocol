@@ -19,6 +19,7 @@
 #include <sys/ioctl.h>
 #include <netinet/ip_icmp.h>
 #include <netdb.h>
+#include <stdbool.h>
 
 /*
  * Authors: Justin Sorensen, Meghan Harris, and Professor Kalafut
@@ -136,7 +137,7 @@ int main()
       ip = inet_ntoa(((struct sockaddr_in *)&ifr.ifr_ifru.ifru_addr)->sin_addr);
       printf("Ip: %s\n", ip);
       ipAddress[ipCounter] = *ip;
-      ipCounter+= 8;
+      ipCounter += 8;
       memcpy(&routerAddress[counter], ip, sizeof(ip));
       counter += 8;
 
@@ -289,10 +290,12 @@ int main()
 
             /********************* Forward pack here ***********************/
             char *fileName = "-table.txt";
-            if(strstr("r1", device_name)){
+            if (strstr("r1", device_name))
+            {
               strcpy(device_name, "r1");
             }
-            else{
+            else
+            {
               strcpy(device_name, "r2");
             }
             strcat(&device_name[2], fileName);
@@ -319,29 +322,37 @@ int main()
             printf("file contents 4\n%s\n", &routingTable[69]);
             printf("file contents 5\n%s\n", &routingTable[92]);
 
-            int desiredSocket = -1;
-            for (int i = 0; i < 130; i += 23)
+            int socketCounter = 0;
+            bool match = false;
+            // for (int i = 0; i < 130; i += 23)
+            do
             {
               char temp_ip[INET_ADDRSTRLEN];
               char temp_tip[INET_ADDRSTRLEN];
-              strncpy(temp_ip, &routingTable[i + 23], 8);
+              char *nul_char = "\0";
+              strncpy(temp_ip, &routingTable[socketCounter], 8);
               inet_ntop(AF_INET, &(iph.daddr), temp_tip, INET_ADDRSTRLEN);
               strcpy(&temp_tip[7], "0");
               strcpy(&temp_ip[7], "0");
+              strcat(&temp_tip[8], nul_char);
+              strcat(&temp_ip[8], nul_char);
               printf("temp tip : %s\n", temp_tip);
               printf("temp ip : %s\n", temp_ip);
-              
-              
-              
-              if (!strcmp(temp_ip, temp_tip))
+
+              if (!strncmp(temp_ip, temp_tip, 6))
               {
                 printf("match found");
-                desiredSocket = i;
-                printf("socket assigned");
+                match = true;
+                printf("socket assigned\n");
                 break;
               }
-            }
-            if (desiredSocket == -1)
+              socketCounter += 23;
+            } while (socketCounter < 130);
+            socketCounter = socketCounter / 23;
+
+            printf("Socket counter: %d\n", socketCounter);
+            printf("Got here\n");
+            if (!match)
             {
               // Create ICMP Destination Unreachable
               printf("Network Unreachable packet\n\n");
@@ -386,7 +397,7 @@ int main()
             char buffCache[1500];
             memcpy(&buffCache, buf, sizeof(buf));
             char temp_tip[INET_ADDRSTRLEN];
-            strncpy(temp_tip, &routerAddress[(desiredSocket * 54) + 46], 8);
+            strncpy(temp_tip, &routerAddress[(socketCounter * 54) + 46], 8);
             inet_ntop(AF_INET, &(arpRequest.arp_spa), temp_tip, INET_ADDRSTRLEN);
 
             // Broadcast value
@@ -399,7 +410,7 @@ int main()
             // Set Destination IP
             memcpy(&temp_tip, "10.0.0.2", 8);
             inet_ntop(AF_INET, &(arpRequest.arp_spa), temp_tip, INET_ADDRSTRLEN);
-
+            printf("Got here 2\n");
             // Set up the rest of the ea_hdr
             arpRequest.ea_hdr.ar_pln = 4;
             arpRequest.ea_hdr.ar_op = htons(1);
@@ -415,8 +426,8 @@ int main()
             memcpy(&temp_buf[0], &ehRequest, 14);
             memcpy(&temp_buf[14], &arpRequest, sizeof(arpRequest));
 
-            int success = send(packet_socket[j], temp_buf, n, 0);
-            if (success == -1)
+            int send_arp = send(packet_socket[j], temp_buf, n, 0);
+            if (send_arp == -1)
             {
               perror("send():");
               exit(90);
