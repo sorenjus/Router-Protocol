@@ -226,6 +226,7 @@ int main()
             printf("Packet Timeout\n\n");
             // Create ICMP Destination Unreachable
             printf("Network Unreachable packet\n\n");
+            iphResponse = iph;
 
             memcpy(&arp_tip, &routerAddress[(j * 54) + 46], 8);
             strncpy(arp_tip, toip(arp_tip), 8);
@@ -233,12 +234,11 @@ int main()
             memcpy(&iphResponse.saddr, &x.saddr, sizeof(iph.daddr));
             memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
             iphResponse.protocol = 1;
-            iphResponse.tot_len = htons(26);
+            iphResponse.ttl = 32;
 
-            iph.check = 0;
-            memcpy(&buf[14], &iph, sizeof(iph));
-            iph.check = checksum(&buf[14], sizeof(iph));
-            memcpy(&buf[14], &iph, sizeof(iph));
+            iphResponse.check = 0;
+            memcpy(&buf[14], &iphResponse, sizeof(iph));
+            iphResponse.check = checksum(&buf[14], sizeof(iph));
 
             // build EH portion
             memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
@@ -252,7 +252,6 @@ int main()
             icmp.seqnum = 5;
             icmp.id = 0;
 
-            iphResponse.ttl = 32;
             // Add everything to the message to send
             memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
             memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
@@ -515,9 +514,7 @@ int main()
                   // Send ICMP
                   // Create ICMP Destination Unreachable
                   printf("Host Unreachable packet\n\n");
-
-                  // Create ICMP Destination Unreachable
-                  printf("Network Unreachable packet\n\n");
+                  iphResponse = iph;
 
                   memcpy(&arp_tip, &routerAddress[(j * 54) + 46], 8);
                   strncpy(arp_tip, toip(arp_tip), 8);
@@ -525,12 +522,11 @@ int main()
                   memcpy(&iphResponse.saddr, &x.saddr, sizeof(iph.daddr));
                   memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
                   iphResponse.protocol = 1;
-                  iphResponse.tot_len = htons(26);
+                  iphResponse.ttl = 32;
 
-                  iph.check = 0;
-                  memcpy(&buf[14], &iph, sizeof(iph));
-                  iph.check = checksum(&buf[14], sizeof(iph));
-                  memcpy(&buf[14], &iph, sizeof(iph));
+                  iphResponse.check = 0;
+                  memcpy(&buf[14], &iphResponse, sizeof(iph));
+                  iphResponse.check = checksum(&buf[14], sizeof(iph));
 
                   // build EH portion
                   memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
@@ -544,7 +540,6 @@ int main()
                   icmp.seqnum = 5;
                   icmp.id = 0;
 
-                  iphResponse.ttl = 32;
                   // Add everything to the message to send
                   memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
                   memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
