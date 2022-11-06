@@ -579,7 +579,9 @@ int main()
                     perror("send():");
                     exit(90);
                   }
-                  printf("Forwarded a packet: %d\n", forwarded);
+                  char temp_tip[INET_ADDRSTRLEN];
+                  inet_ntop(AF_INET, &(arpRequest.arp_tpa), temp_tip, INET_ADDRSTRLEN);
+                  printf("Forwarded a packet to MAC address %s and IP Address %s\n\n", ether_ntoa((struct ether_addr *)&ehResponse.ether_dhost), temp_tip);
                 }
               }
             }
@@ -698,7 +700,7 @@ int main()
   // free the interface list when we don't need it anymore
   freeifaddrs(ifaddr);
   freeifaddrs(tmp);
-  for (int j = 0; j < 10; ++j)
+  for (int j = 0; j < index; ++j)
     close(packet_socket[j]);
 
   // exit
