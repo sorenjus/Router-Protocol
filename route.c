@@ -234,6 +234,7 @@ int main()
             // Reenter while if bad checksum
             if (ntohs(iph.check) != ntohs(temp_checksum))
               continue;
+            
             // Send Time Exceeded Message
             else if (iph.ttl == 0)
             {
@@ -274,6 +275,12 @@ int main()
               printf("Sent ICMP ttl message\n");
               continue;
             }
+
+            
+            iph.check = 0;
+            memcpy(&buf[14], &iph, sizeof(iph));
+            iph.check = checksum(&buf[14], sizeof(iph));
+            memcpy(&buf[14], &iph, sizeof(iph));
 
             /********************* Forward pack here ***********************/
             char *fileName = "-table.txt";
@@ -440,7 +447,12 @@ int main()
               memcpy(arpRequest.arp_sha, ether_aton(temp_mac), 6);
 
               // Set Destination IP
+              if(another_router){
               memcpy(&arpRequest.arp_tpa, &x.daddr, 8);
+              }
+              else{
+                memcpy(&arpRequest.arp_tpa, &iph.daddr, 8);
+              }
               memcpy(&arpRequest.arp_spa, &x.saddr, 8);
 
               // Set up the rest of the ea_hdr
@@ -463,6 +475,7 @@ int main()
               if (another_router)
               {
                 send_arp = send(packet_socket[1], temp_buf, n, 0);
+                socketCounter = 1;
               }
               else
               {
@@ -532,7 +545,7 @@ int main()
                   ehResponse.ether_type = htons(0x0800);
 
                   memcpy(&buffCache[0], &ehResponse, 14);
-                  int forwarded = send(packet_socket[socketCounter], temp_buf, n, 0);
+                  int forwarded = send(packet_socket[socketCounter], buffCache, n, 0);
                   if (forwarded == -1)
                   {
                     perror("send():");
