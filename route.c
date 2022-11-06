@@ -180,6 +180,7 @@ int main()
   {
     // Place to hold packet we receive
     char buf[1500];
+    char arp_tip[20];
     // Temp file descriptor
     fd_set fdstmp = myfds;
     // Wait for an actual message
@@ -217,8 +218,59 @@ int main()
           memcpy(&iph, &buf[14], sizeof(iph));
           memcpy(&iphResponse, &iph, sizeof(iph));
 
-          // Determine if this packet was meant for us
+          iph.ttl--;
 
+          // Send Time Exceeded Message
+          if (iph.ttl == 0)
+          {
+            printf("Packet Timeout\n\n");
+            // Create ICMP Destination Unreachable
+            printf("Network Unreachable packet\n\n");
+
+            memcpy(&arp_tip, &routerAddress[(j * 54) + 46], 8);
+            strncpy(arp_tip, toip(arp_tip), 8);
+            x.saddr = inet_addr(arp_tip);
+            memcpy(&iphResponse.saddr, &x.saddr, sizeof(iph.daddr));
+            memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
+            iphResponse.protocol = 1;
+            iphResponse.tot_len = htons(26);
+
+            iph.check = 0;
+            memcpy(&buf[14], &iph, sizeof(iph));
+            iph.check = checksum(&buf[14], sizeof(iph));
+            memcpy(&buf[14], &iph, sizeof(iph));
+
+            // build EH portion
+            memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
+            memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
+            ehResponse.ether_type = htons(0x0800);
+
+            // Set type and checksum to zero
+            icmp.type = 3;
+            icmp.checksum = 0;
+            icmp.code = 0;
+            icmp.seqnum = 5;
+            icmp.id = 0;
+
+            iphResponse.ttl = 32;
+            // Add everything to the message to send
+            memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
+            memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
+            memcpy(&temp_buf[34], &icmp, sizeof(icmp));
+
+            // Calculate checksum
+            icmp.checksum = checksum(&temp_buf[14], n - 14);
+            memcpy(&temp_buf[34], &icmp, sizeof(icmp));
+            // Send ICMP Echo Reply
+            int success = send(packet_socket[j], temp_buf, 98, 0);
+            if (success == -1)
+            {
+              perror("send():");
+              exit(90);
+            }
+            continue;
+          }
+          iph.ttl++;
           // Forward packet
           if (iph.protocol != 1)
           {
@@ -234,49 +286,7 @@ int main()
             // Reenter while if bad checksum
             if (ntohs(iph.check) != ntohs(temp_checksum))
               continue;
-            
-            // Send Time Exceeded Message
-            else if (iph.ttl == 0)
-            {
-              printf("Packet Timeout\n\n");
-              // build IP portion
-              memcpy(&iphResponse.saddr, &iph.daddr, sizeof(iph.daddr)); /*change to be our IP address*/
-              memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
-              // build EH portion
-              memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
-              memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost)); /*change to be our MAC address*/
-              memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
 
-              // Set type and checksum to zero
-              icmp.type = 11;
-              icmp.checksum = 0;
-              icmp.code = 0;
-              icmp.seqnum = 1;
-              icmp.id = 0;
-
-              iphResponse.ttl = 32;
-              // Add everything to the message to send
-              memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
-              memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
-              memcpy(&temp_buf[34], &icmp, sizeof(icmp));
-              // Data
-              memcpy(&temp_buf[42], &buf[42], n - 42);
-
-              // Calculate checksum
-              icmp.checksum = checksum(&temp_buf[14], n - 14);
-              memcpy(&temp_buf[36], &icmp.checksum, 2);
-              // Send ICMP Echo Reply
-              int success = send(packet_socket[j], temp_buf, n, 0);
-              if (success == -1)
-              {
-                perror("send():");
-                exit(90);
-              }
-              printf("Sent ICMP ttl message\n");
-              continue;
-            }
-
-            
             iph.check = 0;
             memcpy(&buf[14], &iph, sizeof(iph));
             iph.check = checksum(&buf[14], sizeof(iph));
@@ -384,19 +394,29 @@ int main()
               // Create ICMP Destination Unreachable
               printf("Network Unreachable packet\n\n");
 
-              // build IP portion
-              memcpy(&iphResponse.saddr, &iph.daddr, sizeof(iph.daddr)); /*change to be our IP address*/
+              memcpy(&arp_tip, &routerAddress[(j * 54) + 46], 8);
+              strncpy(arp_tip, toip(arp_tip), 8);
+              x.saddr = inet_addr(arp_tip);
+              memcpy(&iphResponse.saddr, &x.saddr, sizeof(iph.daddr));
               memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
+              iphResponse.protocol = 1;
+              iphResponse.tot_len = htons(26);
+
+              iph.check = 0;
+              memcpy(&buf[14], &iph, sizeof(iph));
+              iph.check = checksum(&buf[14], sizeof(iph));
+              memcpy(&buf[14], &iph, sizeof(iph));
+
               // build EH portion
               memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
-              memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost)); /*change to be our MAC address*/
-              memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
+              memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
+              ehResponse.ether_type = htons(0x0800);
 
               // Set type and checksum to zero
               icmp.type = 3;
               icmp.checksum = 0;
               icmp.code = 0;
-              icmp.seqnum = 1;
+              icmp.seqnum = 5;
               icmp.id = 0;
 
               iphResponse.ttl = 32;
@@ -404,14 +424,12 @@ int main()
               memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
               memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
               memcpy(&temp_buf[34], &icmp, sizeof(icmp));
-              // Data
-              memcpy(&temp_buf[42], &buf[42], n - 42);
 
               // Calculate checksum
               icmp.checksum = checksum(&temp_buf[14], n - 14);
-              memcpy(&temp_buf[36], &icmp.checksum, 2);
+              memcpy(&temp_buf[34], &icmp, sizeof(icmp));
               // Send ICMP Echo Reply
-              int success = send(packet_socket[j], temp_buf, n, 0);
+              int success = send(packet_socket[j], temp_buf, 98, 0);
               if (success == -1)
               {
                 perror("send():");
@@ -427,7 +445,6 @@ int main()
               memcpy(&buffCache, buf, sizeof(buf));
 
               // Set MAC depending on the correct interface
-              char arp_tip[20];
               if (another_router)
               {
                 memcpy(&arp_tip, &routerAddress[100], 8);
@@ -447,10 +464,12 @@ int main()
               memcpy(arpRequest.arp_sha, ether_aton(temp_mac), 6);
 
               // Set Destination IP
-              if(another_router){
-              memcpy(&arpRequest.arp_tpa, &x.daddr, 8);
+              if (another_router)
+              {
+                memcpy(&arpRequest.arp_tpa, &x.daddr, 8);
               }
-              else{
+              else
+              {
                 memcpy(&arpRequest.arp_tpa, &iph.daddr, 8);
               }
               memcpy(&arpRequest.arp_spa, &x.saddr, 8);
@@ -497,19 +516,32 @@ int main()
                   // Create ICMP Destination Unreachable
                   printf("Host Unreachable packet\n\n");
 
-                  // build IP portion
-                  memcpy(&iphResponse.saddr, &iph.daddr, sizeof(iph.daddr)); /*change to be our IP address*/
+                  // Create ICMP Destination Unreachable
+                  printf("Network Unreachable packet\n\n");
+
+                  memcpy(&arp_tip, &routerAddress[(j * 54) + 46], 8);
+                  strncpy(arp_tip, toip(arp_tip), 8);
+                  x.saddr = inet_addr(arp_tip);
+                  memcpy(&iphResponse.saddr, &x.saddr, sizeof(iph.daddr));
                   memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
+                  iphResponse.protocol = 1;
+                  iphResponse.tot_len = htons(26);
+
+                  iph.check = 0;
+                  memcpy(&buf[14], &iph, sizeof(iph));
+                  iph.check = checksum(&buf[14], sizeof(iph));
+                  memcpy(&buf[14], &iph, sizeof(iph));
+
                   // build EH portion
                   memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
-                  memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost)); /*change to be our MAC address*/
-                  memcpy(&ehResponse.ether_type, &eh.ether_type, sizeof(eh.ether_type));
+                  memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
+                  ehResponse.ether_type = htons(0x0800);
 
                   // Set type and checksum to zero
                   icmp.type = 3;
                   icmp.checksum = 0;
-                  icmp.code = 1;
-                  icmp.seqnum = 1;
+                  icmp.code = 0;
+                  icmp.seqnum = 5;
                   icmp.id = 0;
 
                   iphResponse.ttl = 32;
@@ -517,15 +549,13 @@ int main()
                   memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
                   memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
                   memcpy(&temp_buf[34], &icmp, sizeof(icmp));
-                  // Data
-                  memcpy(&temp_buf[42], &buf[42], n - 42);
 
                   // Calculate checksum
                   icmp.checksum = checksum(&temp_buf[14], n - 14);
-                  memcpy(&temp_buf[36], &icmp.checksum, 2);
+                  memcpy(&temp_buf[34], &icmp, sizeof(icmp));
                   // Send ICMP Echo Reply
-                  int unreachable = send(packet_socket[j], temp_buf, n, 0);
-                  if (unreachable == -1)
+                  int success = send(packet_socket[j], temp_buf, 98, 0);
+                  if (success == -1)
                   {
                     perror("send():");
                     exit(90);
