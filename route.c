@@ -93,6 +93,7 @@ int main()
   timeout.tv_usec = 0;
   // Broadcast variable
   char broadcast[] = "ff:ff:ff:ff:ff:ff";
+  char target_address[] = "00:00:00:00:00:00";
 
   // get list of interface addresses. This is a linked list. Next
   // pointer is in ifa_next, interface name is in ifa_name, address is
@@ -458,7 +459,7 @@ int main()
               x.saddr = inet_addr(arp_tip);
 
               // Put broadcast and our MAC Addr in the ArpRequest
-              memcpy(arpRequest.arp_tha, ether_aton(broadcast), 6);
+              memcpy(arpRequest.arp_tha, ether_aton(target_address), 6);
               memcpy(arpRequest.arp_sha, ether_aton(temp_mac), 6);
 
               // Set Destination IP
