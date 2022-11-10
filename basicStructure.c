@@ -224,7 +224,7 @@ int main()
                 {
                     // check if ARP -- check arp_tpa for us
                     memcpy(&arpReceived, &buf[14], sizeof(arpReceived));
-                    
+
                     inet_ntop(AF_INET, &(arpReceived.arp_tpa), temp_ip, INET_ADDRSTRLEN);
                     memcpy(temp_addr, &routerAddress[(j * 54) + 46], 8);
 
@@ -232,7 +232,7 @@ int main()
 
                     if (!strcmp(temp_ip, temp_addr))
                     { // this should be the IP addr of this interface
-                    printf("ARP for us");
+                        printf("ARP for us");
                         memcpy(&arpReceived, &buf[14], sizeof(arpReceived));
 
                         // Find the right MAC address associated with IP
@@ -292,7 +292,8 @@ int main()
                     printf("IPv4 packet\n");
                     memcpy(&iph, &buf[14], sizeof(iph));
                     // check if this is for us
-                    inet_ntop(AF_INET, &(iph.daddr), temp_tip, INET_ADDRSTRLEN);
+                    memcpy(temp_ip, &iph.daddr, 8);
+                    inet_ntop(AF_INET, &(temp_ip), temp_tip, INET_ADDRSTRLEN);
                     memcpy(temp_addr, &routerAddress[(j * 54) + 46], 8);
 
                     if (!strcmp(temp_tip, temp_addr))
@@ -333,7 +334,6 @@ int main()
 
                             // Send ICMP Echo Reply
                             int success = send(packet_socket[j], temp_buf, n, 0);
-                            printf("ICMP packet sent\n");
                             if (success == -1)
                             {
                                 perror("send():");
@@ -347,7 +347,7 @@ int main()
                     }
                     else
                     {
-                            printf("ICMP for someone else\n");
+                        printf("ICMP for someone else\n");
                         if (iph.ttl == 1)
                         {
                             printf("TTL Exceeded\n\n");
