@@ -252,7 +252,7 @@ int main()
             icmp.type = 11;
             icmp.checksum = 0;
             icmp.code = 0;
-            icmp.seqnum = 5;
+            icmp.seqnum = 0;
             icmp.id = 0;
 
             // Add everything to the message to send
@@ -273,7 +273,7 @@ int main()
             }
             continue;
           }
-          // Forward packet
+          // Forward packet          
           if (iph.protocol != 1)
           {
             // Verify checksum
@@ -418,7 +418,7 @@ int main()
               icmp.type = 3;
               icmp.checksum = 0;
               icmp.code = 0;
-              icmp.seqnum = 5;
+              icmp.seqnum = 0;
               icmp.id = 0;
 
               // Add everything to the message to send
@@ -538,7 +538,7 @@ int main()
                   icmp.type = 3;
                   icmp.checksum = 0;
                   icmp.code = 1;
-                  icmp.seqnum = 5;
+                  icmp.seqnum = 0;
                   icmp.id = 0;
 
                   // Add everything to the message to send
