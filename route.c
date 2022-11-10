@@ -264,8 +264,13 @@ int main()
             icmp.checksum = checksum(&temp_buf[14], 28);
             memcpy(&temp_buf[34], &icmp, sizeof(icmp));
 
+            // Original IP header
+            memcpy(&temp_buf[42], &iph, sizeof(iph));
+            // first 8 bytes of original data
+            memcpy(&temp_buf[62], &buf[34], 8);
+
             // Send ICMP Echo Reply
-            int success = send(packet_socket[j], temp_buf, 42, 0);
+            int success = send(packet_socket[j], temp_buf, 70, 0);
             if (success == -1)
             {
               perror("send():");
@@ -273,7 +278,7 @@ int main()
             }
             continue;
           }
-          // Forward packet          
+          // Forward packet
           if (iph.protocol != 1)
           {
             // Verify checksum
@@ -430,8 +435,13 @@ int main()
               icmp.checksum = checksum(&temp_buf[14], 28);
               memcpy(&temp_buf[34], &icmp, sizeof(icmp));
 
+              // Original IP header
+              memcpy(&temp_buf[42], &iph, sizeof(iph));
+              // first 8 bytes of original data
+              memcpy(&temp_buf[62], &buf[34], 8);
+
               // Send ICMP Echo Reply
-              int success = send(packet_socket[j], temp_buf, 42, 0);
+              int success = send(packet_socket[j], temp_buf, 70, 0);
               if (success == -1)
               {
                 perror("send():");
@@ -492,12 +502,12 @@ int main()
               int send_arp;
               if (another_router)
               {
-                send_arp = send(packet_socket[1], temp_buf, n, 0);
+                send_arp = send(packet_socket[1], temp_buf, 42, 0);
                 socketCounter = 1;
               }
               else
               {
-                send_arp = send(packet_socket[socketCounter], temp_buf, n, 0);
+                send_arp = send(packet_socket[socketCounter], temp_buf, 42, 0);
               }
               if (send_arp == -1)
               {
@@ -550,8 +560,13 @@ int main()
                   icmp.checksum = checksum(&temp_buf[14], 28);
                   memcpy(&temp_buf[34], &icmp, sizeof(icmp));
 
+                  // Original IP header
+                  memcpy(&temp_buf[42], &iph, sizeof(iph));
+                  // first 8 bytes of original data
+                  memcpy(&temp_buf[62], &buf[34], 8);
+
                   // Send ICMP Echo Reply
-                  int success = send(packet_socket[j], temp_buf, 42, 0);
+                  int success = send(packet_socket[j], temp_buf, 70, 0);
                   if (success == -1)
                   {
                     perror("send():");
@@ -568,7 +583,7 @@ int main()
                 {
                   // check that the arp header no longer holds the broadcast value
                   memcpy(&ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
-                  memcpy(&ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
+                  memcpy(&ehResponse.ether_dhost, ether_aton(temp_mac), sizeof(eh.ether_shost));
                   ehResponse.ether_type = htons(0x0800);
 
                   memcpy(&buffCache[0], &ehResponse, 14);
