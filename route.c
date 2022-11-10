@@ -216,6 +216,7 @@ int main()
           continue;
         // start processing all others
         memcpy(&eh, buf, 14);
+        /******************start of new code******/
 
         // When the packet is an ICMP or IPv4
         if (ntohs(eh.ether_type) == 0x0800)
@@ -223,6 +224,7 @@ int main()
           memcpy(&iph, &buf[14], sizeof(iph));
           memcpy(&iphResponse, &iph, sizeof(iph));
 
+/*
           // Send Time Exceeded Message
           if (iph.ttl == 1)
           {
@@ -278,9 +280,11 @@ int main()
             }
             continue;
           }
+          */
           // Forward packet
           if (iph.protocol != 1)
           {
+            /*
             // Verify checksum
             uint16_t temp_checksum = iph.check;
             iph.check = 0;
@@ -600,10 +604,12 @@ int main()
                 }
               }
             }
+            */
           }
           // reply to ICMP
           else
           {
+            /*
             printf("ICMP\n\n");
 
             // build IP portion
@@ -642,11 +648,12 @@ int main()
               exit(90);
             }
           }
+          */
         }
         // when an ARP request is processed, respond
         else if (ntohs(eh.ether_type) == 0x0806 && !strcmp(ether_ntoa((struct ether_addr *)&eh.ether_dhost), broadcast))
         {
-          memcpy(&arpReceived, &buf[14], sizeof(arpReceived));
+          /*memcpy(&arpReceived, &buf[14], sizeof(arpReceived));
 
           // Find the right MAC address associated with IP
           for (int i = 0; i < sizeof(routerAddress); i += 54)
@@ -692,6 +699,7 @@ int main()
           // Reset all of the info for type
           uint16_t reset = 0x0;
           memcpy(&eh.ether_type, &reset, sizeof(eh.ether_type));
+          */
         }
       }
       if (FD_ISSET(STDIN_FILENO, &fdstmp))
