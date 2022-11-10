@@ -283,7 +283,8 @@ int main()
                     else
                     {
                         printf("ARP for someone else");
-                        /**********forward code modified to not have ip header and sends with arpReceived spa instead of ours*************/
+                        /**********forward code modified to not have ip header, indexing against arp_tpa
+                         * sends with arpReceived spa instead of ours*************/
                     }
                 }
                 // if not read IP header
@@ -291,6 +292,7 @@ int main()
                 {
                     printf("IPv4 packet\n");
                     memcpy(&iph, &buf[14], sizeof(iph));
+                    memcpy(&iphResponse, &buf[14], sizeof(iph));
                     // check if this is for us
                     memcpy(temp_ip, &iph.daddr, 8);
                     inet_ntop(AF_INET, &(temp_ip), temp_tip, INET_ADDRSTRLEN);
