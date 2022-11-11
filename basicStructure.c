@@ -234,7 +234,7 @@ int main()
                     { // this should be the IP addr of this interface
                         printf("ARP for us");
                         memcpy(&arpReceived, &buf[14], sizeof(arpReceived));
-
+                        /*
                         // Find the right MAC address associated with IP
                         for (int i = 0; i < sizeof(routerAddress); i += 54)
                         {
@@ -248,6 +248,7 @@ int main()
                                 break;
                             }
                         }
+                        */
                         // Set ARP response to received and change op code to 2
                         arpResponse = arpReceived;
                         arpResponse.ea_hdr.ar_op = htons(2);
@@ -285,6 +286,157 @@ int main()
                         printf("ARP for someone else");
                         /**********forward code modified to not have ip header, indexing against arp_tpa
                          * sends with arpReceived spa instead of ours*************/
+
+                        //Read the routing table
+                        char *fileName = "-table.txt";
+                        if (strstr(device_name, "r1"))
+                        {
+                            strcpy(device_name, "r1");
+                        }
+                        else
+                        {
+                            strcpy(device_name, "r2");
+                        }
+                        strcat(&device_name[2], fileName);
+                        printf("file name: %s\n", device_name);
+                        FILE *file;
+                        file = fopen(device_name, "r+");
+                        printf("file open\n");
+
+                        // if the file is Null return the error message and exit
+                        if (file == NULL)
+                        {
+                            printf("Error! Could not open file\n");
+                            exit(-1);
+                        }
+                        int fileCounter = 0;
+                        do
+                        {
+                            fgets(&routingTable[fileCounter], 23, file);
+                            fileCounter += 23;
+                        } while (!feof(file));
+
+                        //find the correct interface to use
+                        int socketCounter = 0;
+                        bool match, another_router = false;
+                        do
+                        {
+                            char *nul_char = "\0";
+                            strncpy(temp_ip, &routingTable[socketCounter], 8);
+                            inet_ntop(AF_INET, &(iph.daddr), temp_tip, INET_ADDRSTRLEN);
+                            strcpy(&temp_tip[7], "0");
+                            strcpy(&temp_ip[7], "0");
+                            strcat(&temp_tip[8], nul_char);
+                            strcat(&temp_ip[8], nul_char);
+
+                            // Match found
+                            if (!strncmp(temp_ip, temp_tip, 6))
+                            {
+                                char not_another_temp[20];
+
+                                // Case where match is another router
+                                if (strstr(device_name, "r1"))
+                                {
+                                    if (!strcmp(temp_ip, "10.3.0.0"))
+                                    {
+                                        memcpy(&not_another_temp, "10.0.0.2", 9);
+                                        strncpy(not_another_temp, toip(not_another_temp), 20);
+                                        x.daddr = inet_addr(not_another_temp);
+                                        another_router = true;
+                                    }
+                                }
+                                else if (strstr(device_name, "r2"))
+                                {
+                                    if (!strcmp(temp_ip, "10.1.0.0"))
+                                    {
+                                        memcpy(&not_another_temp, "10.0.0.1", 9);
+                                        strncpy(not_another_temp, toip(not_another_temp), 20);
+                                        x.daddr = inet_addr(not_another_temp);
+                                        another_router = true;
+                                    }
+                                }
+                                else
+                                {
+                                    x.daddr = iph.daddr;
+                                }
+                                match = true;
+                                break;
+                            }
+                            socketCounter += 23;
+                        } while (socketCounter < 130);
+                        socketCounter = (socketCounter / 23) + 1;
+
+                        // Set source MAC address
+                        if (another_router)
+                        {
+                            memcpy(&temp_mac, &routerAddress[54], 46);
+                        }
+                        else
+                        {
+                            memcpy(&temp_mac, &routerAddress[socketCounter * 54], 46);
+                        }
+
+                        if (!match)
+                        {
+                            // Create ICMP Destination Unreachable
+                            printf("Network Unreachable packet\n\n");
+
+                            // Build IP Header
+                            iphResponse = iph;
+                            memcpy(&arp_tip, &routerAddress[(j * 54) + 46], 8);
+                            strncpy(arp_tip, toip(arp_tip), 8);
+                            x.saddr = inet_addr(arp_tip);
+                            memcpy(&iphResponse.saddr, &x.saddr, sizeof(iph.daddr));
+                            memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
+                            iphResponse.protocol = 1;
+                            iphResponse.ttl = 32;
+                            iphResponse.tot_len = htons(28);
+                            iphResponse.check = 0;
+                            memcpy(&buf[14], &iphResponse, sizeof(iph));
+                            iphResponse.check = checksum(&buf[14], sizeof(iph));
+
+                            // build EH portion
+                            memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
+                            memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
+                            ehResponse.ether_type = htons(0x0800);
+
+                            // Setup ICMP properties
+                            icmp.type = 3;
+                            icmp.checksum = 0;
+                            icmp.code = 0;
+                            icmp.seqnum = 0;
+                            icmp.id = 0;
+
+                            // Add everything to the message to send
+                            memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
+                            memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
+                            memcpy(&temp_buf[34], &icmp, sizeof(icmp));
+
+                            // Calculate checksum
+                            icmp.checksum = checksum(&temp_buf[14], 28);
+                            memcpy(&temp_buf[34], &icmp, sizeof(icmp));
+
+                            // Original IP header
+                            memcpy(&temp_buf[42], &iph, sizeof(iph));
+                            // first 8 bytes of original data
+                            memcpy(&temp_buf[62], &buf[34], 8);
+
+                            // Send ICMP Echo Reply
+                            int success = send(packet_socket[j], temp_buf, 70, 0);
+                            if (success == -1)
+                            {
+                                perror("send():");
+                                exit(90);
+                            }
+                            continue;
+                        }
+                        else
+                        {
+                            // Setup ARP Request
+                            char buffCache[1500];
+
+                        //Create ARPRequest
+                        }
                     }
                 }
                 // if not read IP header
