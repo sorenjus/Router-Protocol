@@ -810,7 +810,7 @@ int main()
                             socketCounter += 23;
                         } while (socketCounter < 130);
                         char not_another_temp[20];
-                        if (strstr(device_name, "r1"))
+                        if (!match && strstr(device_name, "r1"))
                         {
                             printf("Device name match\n");
                             if (strstr(temp_ip, "10.3.") != NULL)
@@ -822,7 +822,7 @@ int main()
                                 another_router = true;
                             }
                         }
-                        else if (strstr(device_name, "r2"))
+                        else if (!match && strstr(device_name, "r2"))
                         {
                             if (strstr(temp_ip, "10.1.") != NULL)
                             {
