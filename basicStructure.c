@@ -801,279 +801,282 @@ int main()
                             // Match found
                             if (!strncmp(temp_ip, temp_tip, 6))
                             {
-                                x.daddr = iph.daddr;
+                                char not_another_temp[20];
 
+                                // Case where match is another router
+                                if (strstr(device_name, "r1"))
+                                {
+                                    printf("Device name match\n");
+                                    if (strstr(temp_ip, "10.3.") != NULL)
+                                    {
+                                        printf("Going to r2\n");
+                                        memcpy(&not_another_temp, "10.0.0.2", 9);
+                                        strncpy(not_another_temp, toip(not_another_temp), 20);
+                                        x.daddr = inet_addr(not_another_temp);
+                                        another_router = true;
+                                    }
+                                }
+                                else if (strstr(device_name, "r2"))
+                                {
+                                    if (strstr(temp_ip, "10.1.") != NULL)
+                                    {
+                                        memcpy(&not_another_temp, "10.0.0.1", 9);
+                                        strncpy(not_another_temp, toip(not_another_temp), 20);
+                                        x.daddr = inet_addr(not_another_temp);
+                                        another_router = true;
+                                    }
+                                }
+                                else
+                                {
+                                    x.daddr = iph.daddr;
+                                }
                                 printf("Yo.\n");
                                 match = true;
                                 break;
                             }
                             socketCounter += 23;
                         } while (socketCounter < 130);
-                        char not_another_temp[20];
-                        if (strstr(device_name, "r1"))
+                        socketCounter = (socketCounter / 23) + 1;
+
+                        // Set source MAC address
+                        if (another_router)
                         {
-                            printf("Device name match\n");
-                            if (strstr(temp_ip, "10.3.") != NULL)
+                            memcpy(&temp_mac, &routerAddress[54], 46);
+                        }
+                        else
+                        {
+                            memcpy(&temp_mac, &routerAddress[socketCounter * 54], 46);
+                        }
+
+                        if (!match)
+                        {
+                            // Create ICMP Destination Unreachable
+                            printf("Network Unreachable packet\n\n");
+
+                            // Build IP Header
+                            iphResponse = iph;
+                            memcpy(&arp_tip, &routerAddress[(j * 54) + 46], 8);
+                            strncpy(arp_tip, toip(arp_tip), 8);
+                            x.saddr = inet_addr(arp_tip);
+                            memcpy(&iphResponse.saddr, &x.saddr, sizeof(iph.daddr));
+                            memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
+                            iphResponse.protocol = 1;
+                            iphResponse.ttl = 32;
+                            iphResponse.tot_len = htons(28);
+                            iphResponse.check = 0;
+                            memcpy(&buf[14], &iphResponse, sizeof(iph));
+                            iphResponse.check = checksum(&buf[14], sizeof(iph));
+
+                            // build EH portion
+                            memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
+                            memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
+                            ehResponse.ether_type = htons(0x0800);
+
+                            // Setup ICMP properties
+                            icmp.type = 3;
+                            icmp.checksum = 0;
+                            icmp.code = 0;
+                            icmp.seqnum = 0;
+                            icmp.id = 0;
+
+                            // Add everything to the message to send
+                            memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
+                            memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
+                            memcpy(&temp_buf[34], &icmp, sizeof(icmp));
+
+                            // Calculate checksum
+                            icmp.checksum = checksum(&temp_buf[14], 28);
+                            memcpy(&temp_buf[34], &icmp, sizeof(icmp));
+
+                            // Original IP header
+                            memcpy(&temp_buf[42], &iph, sizeof(iph));
+                            // first 8 bytes of original data
+                            memcpy(&temp_buf[62], &buf[34], 8);
+
+                            // Send ICMP Echo Reply
+                            int success = send(packet_socket[j], temp_buf, 70, 0);
+                            if (success == -1)
                             {
-                                printf("Going to r2\n");
-                                memcpy(&not_another_temp, "10.0.0.2", 9);
-                                strncpy(not_another_temp, toip(not_another_temp), 20);
-                                x.daddr = inet_addr(not_another_temp);
-                                another_router = true;
+                                perror("send():");
+                                exit(90);
                             }
+                            continue;
                         }
-                        else if (strstr(device_name, "r2"))
+                        else
                         {
-                            if (strstr(temp_ip, "10.1.") != NULL)
+                            // Set Source IP and build an ARP Response
+                            char buffCache[1500];
+                            memcpy(&buffCache, buf, sizeof(buf));
+
+                            // Set MAC depending on the correct interface
+                            if (another_router)
                             {
-                                memcpy(&not_another_temp, "10.0.0.1", 9);
-                                strncpy(not_another_temp, toip(not_another_temp), 20);
-                                x.daddr = inet_addr(not_another_temp);
-                                another_router = true;
+                                memcpy(&arp_tip, &routerAddress[100], 8);
                             }
-                        }
-                    }
-                    socketCounter = (socketCounter / 23) + 1;
-
-                    // Set source MAC address
-                    if (another_router)
-                    {
-                        memcpy(&temp_mac, &routerAddress[54], 46);
-                    }
-                    else
-                    {
-                        memcpy(&temp_mac, &routerAddress[socketCounter * 54], 46);
-                    }
-
-                    if (!match)
-                    {
-                        // Create ICMP Destination Unreachable
-                        printf("Network Unreachable packet\n\n");
-
-                        // Build IP Header
-                        iphResponse = iph;
-                        memcpy(&arp_tip, &routerAddress[(j * 54) + 46], 8);
-                        strncpy(arp_tip, toip(arp_tip), 8);
-                        x.saddr = inet_addr(arp_tip);
-                        memcpy(&iphResponse.saddr, &x.saddr, sizeof(iph.daddr));
-                        memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
-                        iphResponse.protocol = 1;
-                        iphResponse.ttl = 32;
-                        iphResponse.tot_len = htons(28);
-                        iphResponse.check = 0;
-                        memcpy(&buf[14], &iphResponse, sizeof(iph));
-                        iphResponse.check = checksum(&buf[14], sizeof(iph));
-
-                        // build EH portion
-                        memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
-                        memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
-                        ehResponse.ether_type = htons(0x0800);
-
-                        // Setup ICMP properties
-                        icmp.type = 3;
-                        icmp.checksum = 0;
-                        icmp.code = 0;
-                        icmp.seqnum = 0;
-                        icmp.id = 0;
-
-                        // Add everything to the message to send
-                        memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
-                        memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
-                        memcpy(&temp_buf[34], &icmp, sizeof(icmp));
-
-                        // Calculate checksum
-                        icmp.checksum = checksum(&temp_buf[14], 28);
-                        memcpy(&temp_buf[34], &icmp, sizeof(icmp));
-
-                        // Original IP header
-                        memcpy(&temp_buf[42], &iph, sizeof(iph));
-                        // first 8 bytes of original data
-                        memcpy(&temp_buf[62], &buf[34], 8);
-
-                        // Send ICMP Echo Reply
-                        int success = send(packet_socket[j], temp_buf, 70, 0);
-                        if (success == -1)
-                        {
-                            perror("send():");
-                            exit(90);
-                        }
-                        continue;
-                    }
-                    else
-                    {
-                        // Set Source IP and build an ARP Response
-                        char buffCache[1500];
-                        memcpy(&buffCache, buf, sizeof(buf));
-
-                        // Set MAC depending on the correct interface
-                        if (another_router)
-                        {
-                            memcpy(&arp_tip, &routerAddress[100], 8);
-                        }
-                        else
-                        {
-                            memcpy(&arp_tip, &routerAddress[(socketCounter * 54) + 46], 8);
-                        }
-                        // Setup source IP address
-                        strncpy(arp_tip, toip(arp_tip), 8);
-                        x.saddr = inet_addr(arp_tip);
-
-                        // Put broadcast and our MAC Addr in the ArpRequest
-                        memcpy(arpRequest.arp_tha, ether_aton(target_address), 6);
-                        memcpy(arpRequest.arp_sha, ether_aton(temp_mac), 6);
-
-                        // Set Destination IP
-                        if (another_router)
-                        {
-                            memcpy(&arpRequest.arp_tpa, &x.daddr, 8);
-                        }
-                        else
-                        {
-                            memcpy(&arpRequest.arp_tpa, &iph.daddr, 8);
-                        }
-                        memcpy(&arpRequest.arp_spa, &x.saddr, 8);
-
-                        // Set up the rest of the ea_hdr
-                        arpRequest.ea_hdr.ar_pln = 4;
-                        arpRequest.ea_hdr.ar_op = htons(1);
-                        arpRequest.ea_hdr.ar_hln = 6;
-                        arpRequest.ea_hdr.ar_hrd = htons(1);
-                        arpRequest.ea_hdr.ar_pro = 8;
-
-                        // Ether header
-                        memcpy(ehRequest.ether_shost, ether_aton(temp_mac), 6);
-                        memcpy(ehRequest.ether_dhost, ether_aton(broadcast), 6);
-                        ehRequest.ether_type = htons(0x0806);
-
-                        memcpy(&temp_buf[0], &ehRequest, 14);
-                        memcpy(&temp_buf[14], &arpRequest, sizeof(arpRequest));
-
-                        // Determine if we need to send to a host or another router
-                        int send_arp;
-                        if (another_router)
-                        {
-                            send_arp = send(packet_socket[1], temp_buf, 42, 0);
-                            socketCounter = 1;
-                        }
-                        else
-                        {
-                            send_arp = send(packet_socket[socketCounter], temp_buf, 42, 0);
-                        }
-                        if (send_arp == -1)
-                        {
-                            perror("send():");
-                            exit(90);
-                        }
-                        // found the network to send an ARP Request
-                        int f = recvfrom(packet_socket[socketCounter], buf, 1500, 0, (struct sockaddr *)&recvaddr, &recvaddrlen);
-
-                        if (f == -1)
-                        {
-                            if (errno == EWOULDBLOCK)
+                            else
                             {
-                                // Send ICMP
-                                // Create ICMP Destination Unreachable
-                                printf("Host Unreachable packet\n\n");
+                                memcpy(&arp_tip, &routerAddress[(socketCounter * 54) + 46], 8);
+                            }
+                            // Setup source IP address
+                            strncpy(arp_tip, toip(arp_tip), 8);
+                            x.saddr = inet_addr(arp_tip);
 
-                                // Setup IP Header
-                                iphResponse = iph;
-                                memcpy(&arp_tip, &routerAddress[(j * 54) + 46], 8);
-                                strncpy(arp_tip, toip(arp_tip), 8);
-                                x.saddr = inet_addr(arp_tip);
-                                memcpy(&iphResponse.saddr, &x.saddr, sizeof(iph.daddr));
-                                memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
-                                iphResponse.protocol = 1;
-                                iphResponse.ttl = 32;
-                                iphResponse.tot_len = htons(28);
-                                iphResponse.check = 0;
-                                memcpy(&buf[14], &iphResponse, sizeof(iph));
-                                iphResponse.check = checksum(&buf[14], sizeof(iph));
+                            // Put broadcast and our MAC Addr in the ArpRequest
+                            memcpy(arpRequest.arp_tha, ether_aton(target_address), 6);
+                            memcpy(arpRequest.arp_sha, ether_aton(temp_mac), 6);
 
-                                // build EH portion
-                                memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
-                                memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
-                                ehResponse.ether_type = htons(0x0800);
+                            // Set Destination IP
+                            if (another_router)
+                            {
+                                memcpy(&arpRequest.arp_tpa, &x.daddr, 8);
+                            }
+                            else
+                            {
+                                memcpy(&arpRequest.arp_tpa, &iph.daddr, 8);
+                            }
+                            memcpy(&arpRequest.arp_spa, &x.saddr, 8);
 
-                                // Setup ICMP properties
-                                icmp.type = 3;
-                                icmp.checksum = 0;
-                                icmp.code = 1;
-                                icmp.seqnum = 0;
-                                icmp.id = 0;
+                            // Set up the rest of the ea_hdr
+                            arpRequest.ea_hdr.ar_pln = 4;
+                            arpRequest.ea_hdr.ar_op = htons(1);
+                            arpRequest.ea_hdr.ar_hln = 6;
+                            arpRequest.ea_hdr.ar_hrd = htons(1);
+                            arpRequest.ea_hdr.ar_pro = 8;
 
-                                // Add everything to the message to send
-                                memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
-                                memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
-                                memcpy(&temp_buf[34], &icmp, sizeof(icmp));
+                            // Ether header
+                            memcpy(ehRequest.ether_shost, ether_aton(temp_mac), 6);
+                            memcpy(ehRequest.ether_dhost, ether_aton(broadcast), 6);
+                            ehRequest.ether_type = htons(0x0806);
 
-                                // Calculate checksum
-                                icmp.checksum = checksum(&temp_buf[14], 28);
-                                memcpy(&temp_buf[34], &icmp, sizeof(icmp));
+                            memcpy(&temp_buf[0], &ehRequest, 14);
+                            memcpy(&temp_buf[14], &arpRequest, sizeof(arpRequest));
 
-                                // Original IP header
-                                memcpy(&temp_buf[42], &iph, sizeof(iph));
-                                // first 8 bytes of original data
-                                memcpy(&temp_buf[62], &buf[34], 8);
+                            // Determine if we need to send to a host or another router
+                            int send_arp;
+                            if (another_router)
+                            {
+                                send_arp = send(packet_socket[1], temp_buf, 42, 0);
+                                socketCounter = 1;
+                            }
+                            else
+                            {
+                                send_arp = send(packet_socket[socketCounter], temp_buf, 42, 0);
+                            }
+                            if (send_arp == -1)
+                            {
+                                perror("send():");
+                                exit(90);
+                            }
+                            // found the network to send an ARP Request
+                            int f = recvfrom(packet_socket[socketCounter], buf, 1500, 0, (struct sockaddr *)&recvaddr, &recvaddrlen);
 
-                                // Send ICMP Echo Reply
-                                int success = send(packet_socket[j], temp_buf, 70, 0);
-                                if (success == -1)
+                            if (f == -1)
+                            {
+                                if (errno == EWOULDBLOCK)
                                 {
-                                    perror("send():");
-                                    exit(90);
-                                }
-                                continue;
-                            }
-                        }
-                        else
-                        {
-                            // Copy ether header
-                            memcpy(&eh, buf, 14);
-                            if (ntohs(eh.ether_type) == 0x0806)
-                            {
-                                // check that the arp header no longer holds the broadcast value
-                                memcpy(&ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
-                                memcpy(&ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
-                                ehResponse.ether_type = htons(0x0800);
+                                    // Send ICMP
+                                    // Create ICMP Destination Unreachable
+                                    printf("Host Unreachable packet\n\n");
 
-                                memcpy(&buffCache[0], &ehResponse, 14);
-                                int forwarded = send(packet_socket[socketCounter], buffCache, n, 0);
-                                if (forwarded == -1)
-                                {
-                                    perror("send():");
-                                    exit(90);
+                                    // Setup IP Header
+                                    iphResponse = iph;
+                                    memcpy(&arp_tip, &routerAddress[(j * 54) + 46], 8);
+                                    strncpy(arp_tip, toip(arp_tip), 8);
+                                    x.saddr = inet_addr(arp_tip);
+                                    memcpy(&iphResponse.saddr, &x.saddr, sizeof(iph.daddr));
+                                    memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
+                                    iphResponse.protocol = 1;
+                                    iphResponse.ttl = 32;
+                                    iphResponse.tot_len = htons(28);
+                                    iphResponse.check = 0;
+                                    memcpy(&buf[14], &iphResponse, sizeof(iph));
+                                    iphResponse.check = checksum(&buf[14], sizeof(iph));
+
+                                    // build EH portion
+                                    memcpy(ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
+                                    memcpy(ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
+                                    ehResponse.ether_type = htons(0x0800);
+
+                                    // Setup ICMP properties
+                                    icmp.type = 3;
+                                    icmp.checksum = 0;
+                                    icmp.code = 1;
+                                    icmp.seqnum = 0;
+                                    icmp.id = 0;
+
+                                    // Add everything to the message to send
+                                    memcpy(&temp_buf, &ehResponse, sizeof(ehResponse));
+                                    memcpy(&temp_buf[14], &iphResponse, sizeof(iphResponse));
+                                    memcpy(&temp_buf[34], &icmp, sizeof(icmp));
+
+                                    // Calculate checksum
+                                    icmp.checksum = checksum(&temp_buf[14], 28);
+                                    memcpy(&temp_buf[34], &icmp, sizeof(icmp));
+
+                                    // Original IP header
+                                    memcpy(&temp_buf[42], &iph, sizeof(iph));
+                                    // first 8 bytes of original data
+                                    memcpy(&temp_buf[62], &buf[34], 8);
+
+                                    // Send ICMP Echo Reply
+                                    int success = send(packet_socket[j], temp_buf, 70, 0);
+                                    if (success == -1)
+                                    {
+                                        perror("send():");
+                                        exit(90);
+                                    }
+                                    continue;
                                 }
-                                char temp_tip[INET_ADDRSTRLEN];
-                                inet_ntop(AF_INET, &(arpRequest.arp_tpa), temp_tip, INET_ADDRSTRLEN);
-                                printf("Forwarded a packet to MAC address %s and IP Address %s\n\n",
-                                       ether_ntoa((struct ether_addr *)&ehResponse.ether_dhost), temp_tip);
+                            }
+                            else
+                            {
+                                // Copy ether header
+                                memcpy(&eh, buf, 14);
+                                if (ntohs(eh.ether_type) == 0x0806)
+                                {
+                                    // check that the arp header no longer holds the broadcast value
+                                    memcpy(&ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
+                                    memcpy(&ehResponse.ether_dhost, eh.ether_shost, sizeof(eh.ether_shost));
+                                    ehResponse.ether_type = htons(0x0800);
+
+                                    memcpy(&buffCache[0], &ehResponse, 14);
+                                    int forwarded = send(packet_socket[socketCounter], buffCache, n, 0);
+                                    if (forwarded == -1)
+                                    {
+                                        perror("send():");
+                                        exit(90);
+                                    }
+                                    char temp_tip[INET_ADDRSTRLEN];
+                                    inet_ntop(AF_INET, &(arpRequest.arp_tpa), temp_tip, INET_ADDRSTRLEN);
+                                    printf("Forwarded a packet to MAC address %s and IP Address %s\n\n",
+                                           ether_ntoa((struct ether_addr *)&ehResponse.ether_dhost), temp_tip);
+                                }
                             }
                         }
                     }
                 }
             }
+            if (FD_ISSET(STDIN_FILENO, &fdstmp))
+            {
+                printf("The user typed something, I better do something with it\n");
+                char buf[5000];
+                fgets(buf, 5000, stdin);
+                printf("You typed %s\n", buf);
+            }
+            // what else to do is up to you, you can send packets with send,
+            // just like we used for TCP sockets (or you can use sendto, but it
+            // is not necessary, since the headers, including all addresses,
+            // need to be in the buffer you are sending)
         }
-        if (FD_ISSET(STDIN_FILENO, &fdstmp))
-        {
-            printf("The user typed something, I better do something with it\n");
-            char buf[5000];
-            fgets(buf, 5000, stdin);
-            printf("You typed %s\n", buf);
-        }
-        // what else to do is up to you, you can send packets with send,
-        // just like we used for TCP sockets (or you can use sendto, but it
-        // is not necessary, since the headers, including all addresses,
-        // need to be in the buffer you are sending)
     }
-}
-// free the interface list when we don't need it anymore
-freeifaddrs(ifaddr);
-freeifaddrs(tmp);
-for (int j = 0; j < index; ++j)
-    close(packet_socket[j]);
+    // free the interface list when we don't need it anymore
+    freeifaddrs(ifaddr);
+    freeifaddrs(tmp);
+    for (int j = 0; j < index; ++j)
+        close(packet_socket[j]);
 
-// exit
-return 0;
+    // exit
+    return 0;
 }
 
 // Function to calculate checksum
