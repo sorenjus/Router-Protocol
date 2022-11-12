@@ -323,47 +323,50 @@ int main()
                         {
                             char *nul_char = "\0";
                             strncpy(temp_ip, &routingTable[socketCounter], 8);
-                            inet_ntop(AF_INET, &(arpReceived.arp_tpa), temp_tip, INET_ADDRSTRLEN);
+                            inet_ntop(AF_INET, &(iph.daddr), temp_tip, INET_ADDRSTRLEN);
                             strcpy(&temp_tip[7], "0");
                             strcpy(&temp_ip[7], "0");
                             strcat(&temp_tip[8], nul_char);
                             strcat(&temp_ip[8], nul_char);
-
+                            printf("temp ip and temp tip: %s, %s\n", temp_ip, temp_tip);
                             // Match found
                             if (!strncmp(temp_ip, temp_tip, 6))
                             {
-                                char not_another_temp[20];
-
-                                // Case where match is another router
-                                if (strstr(device_name, "r1"))
-                                {
-                                    if (!strcmp(temp_ip, "10.3.0.0"))
-                                    {
-                                        memcpy(&not_another_temp, "10.0.0.2", 9);
-                                        strncpy(not_another_temp, toip(not_another_temp), 20);
-                                        x.daddr = inet_addr(not_another_temp);
-                                        another_router = true;
-                                    }
-                                }
-                                else if (strstr(device_name, "r2"))
-                                {
-                                    if (!strcmp(temp_ip, "10.1.0.0"))
-                                    {
-                                        memcpy(&not_another_temp, "10.0.0.1", 9);
-                                        strncpy(not_another_temp, toip(not_another_temp), 20);
-                                        x.daddr = inet_addr(not_another_temp);
-                                        another_router = true;
-                                    }
-                                }
-                                else
-                                {
-                                    x.daddr = inet_addr(arpReceived.arp_tpa);
-                                }
+                                x.daddr = iph.daddr;
+                                printf("Yo.\n");
                                 match = true;
                                 break;
                             }
                             socketCounter += 23;
                         } while (socketCounter < 130);
+
+                        char not_another_temp[20];
+
+                        // Case where match is another router
+                        if (strstr(device_name, "r1"))
+                        {
+                            printf("Device name match\n");
+                            if (strstr(temp_tip, "10.3.") != NULL)
+                            {
+                                printf("Going to r2\n");
+                                memcpy(&not_another_temp, "10.0.0.2", 9);
+                                strncpy(not_another_temp, toip(not_another_temp), 20);
+                                x.daddr = inet_addr(not_another_temp);
+                                another_router = true;
+                                match = true;
+                            }
+                        }
+                        else if (strstr(device_name, "r2"))
+                        {
+                            if (strstr(temp_tip, "10.1.") != NULL)
+                            {
+                                memcpy(&not_another_temp, "10.0.0.1", 9);
+                                strncpy(not_another_temp, toip(not_another_temp), 20);
+                                x.daddr = inet_addr(not_another_temp);
+                                another_router = true;
+                                match = true;
+                            }
+                        }
                         socketCounter = (socketCounter / 23) + 1;
 
                         // Set source MAC address
@@ -585,8 +588,8 @@ int main()
                                 if (ntohs(eh.ether_type) == 0x0806)
                                 {
                                     // check that the arp header no longer holds the broadcast value
-                                    memcpy(&ehResponse.ether_shost, eh.ether_dhost, sizeof(eh.ether_dhost));
-                                    memcpy(&ehResponse.ether_dhost, ether_aton(temp_mac), sizeof(eh.ether_shost));
+                                    memcpy(&ehResponse.ether_shost, ehResponse.ether_dhost, sizeof(eh.ether_dhost));
+                                    memcpy(&ehResponse.ether_dhost, ehResponse.ether_shost, sizeof(eh.ether_shost));
                                     ehResponse.ether_type = htons(0x0800);
 
                                     struct ether_arp temp_arp;
@@ -801,41 +804,42 @@ int main()
                             // Match found
                             if (!strncmp(temp_ip, temp_tip, 6))
                             {
-                                char not_another_temp[20];
-
-                                // Case where match is another router
-                                if (strstr(device_name, "r1"))
-                                {
-                                    printf("Device name match\n");
-                                    if (strstr(temp_ip, "10.3.") != NULL)
-                                    {
-                                        printf("Going to r2\n");
-                                        memcpy(&not_another_temp, "10.0.0.2", 9);
-                                        strncpy(not_another_temp, toip(not_another_temp), 20);
-                                        x.daddr = inet_addr(not_another_temp);
-                                        another_router = true;
-                                    }
-                                }
-                                else if (strstr(device_name, "r2"))
-                                {
-                                    if (strstr(temp_ip, "10.1.") != NULL)
-                                    {
-                                        memcpy(&not_another_temp, "10.0.0.1", 9);
-                                        strncpy(not_another_temp, toip(not_another_temp), 20);
-                                        x.daddr = inet_addr(not_another_temp);
-                                        another_router = true;
-                                    }
-                                }
-                                else
-                                {
-                                    x.daddr = iph.daddr;
-                                }
+                                x.daddr = iph.daddr;
                                 printf("Yo.\n");
                                 match = true;
                                 break;
                             }
                             socketCounter += 23;
                         } while (socketCounter < 130);
+
+                        char not_another_temp[20];
+
+                        // Case where match is another router
+                        if (strstr(device_name, "r1"))
+                        {
+                            printf("Device name match\n");
+                            if (strstr(temp_tip, "10.3.") != NULL)
+                            {
+                                printf("Going to r2\n");
+                                memcpy(&not_another_temp, "10.0.0.2", 9);
+                                strncpy(not_another_temp, toip(not_another_temp), 20);
+                                x.daddr = inet_addr(not_another_temp);
+                                another_router = true;
+                                match = true;
+                            }
+                        }
+                        else if (strstr(device_name, "r2"))
+                        {
+                            if (strstr(temp_tip, "10.1.") != NULL)
+                            {
+                                memcpy(&not_another_temp, "10.0.0.1", 9);
+                                strncpy(not_another_temp, toip(not_another_temp), 20);
+                                x.daddr = inet_addr(not_another_temp);
+                                another_router = true;
+                                match = true;
+                            }
+                        }
+
                         socketCounter = (socketCounter / 23) + 1;
 
                         // Set source MAC address
