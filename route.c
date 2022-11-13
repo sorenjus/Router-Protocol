@@ -1025,8 +1025,12 @@ int main()
         char buf[5000];
         fgets(buf, 5000, stdin);
         printf("You typed %s\n", buf);
-        if (!strcmp(buf, "quit"))
+        if (strstr(buf, "quit"))
         {
+          freeifaddrs(ifaddr);
+          freeifaddrs(tmp);
+          for (int j = 0; j < index; ++j)
+            close(packet_socket[j]);
           exit(45);
         }
       }
