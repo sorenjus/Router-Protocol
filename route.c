@@ -228,11 +228,8 @@ int main()
           inet_ntop(AF_INET, &(arpReceived.arp_tpa), temp_ip, INET_ADDRSTRLEN);
           memcpy(temp_addr, &routerAddress[(j * 54) + 46], 8);
 
-          printf("temp tip : %s\ntemp ip : %s\n", temp_addr, temp_ip);
-
           if (!strcmp(temp_ip, temp_addr))
-          { // this should be the IP addr of this interface
-            printf("ARP for us");
+          {
             memcpy(&arpReceived, &buf[14], sizeof(arpReceived));
 
             // Find the right MAC address associated with IP
@@ -280,13 +277,8 @@ int main()
             uint16_t reset = 0x0;
             memcpy(&eh.ether_type, &reset, sizeof(eh.ether_type));
           }
-          // if not, foward
           else
           {
-            printf("ARP for someone else");
-            /**********forward code modified to not have ip header, indexing against arp_tpa
-             * sends with arpReceived spa instead of ours*************/
-
             // Read the routing table
             char *fileName = "-table.txt";
             if (strstr(device_name, "r1"))
@@ -298,10 +290,8 @@ int main()
               strcpy(device_name, "r2");
             }
             strcat(&device_name[2], fileName);
-            printf("file name: %s\n", device_name);
             FILE *file;
             file = fopen(device_name, "r+");
-            printf("file open\n");
 
             // if the file is Null return the error message and exit
             if (file == NULL)
@@ -328,12 +318,11 @@ int main()
               strcpy(&temp_ip[7], "0");
               strcat(&temp_tip[8], nul_char);
               strcat(&temp_ip[8], nul_char);
-              printf("temp ip and temp tip: %s, %s\n", temp_ip, temp_tip);
+
               // Match found
               if (!strncmp(temp_ip, temp_tip, 6))
               {
                 x.daddr = iph.daddr;
-                printf("Yo.\n");
                 match = true;
                 break;
               }
@@ -345,10 +334,8 @@ int main()
             // Case where match is another router
             if (strstr(device_name, "r1"))
             {
-              printf("Device name match\n");
               if (strstr(temp_tip, "10.3.") != NULL)
               {
-                printf("Going to r2\n");
                 memcpy(&not_another_temp, "10.0.0.2", 9);
                 strncpy(not_another_temp, toip(not_another_temp), 20);
                 x.daddr = inet_addr(not_another_temp);
@@ -382,8 +369,6 @@ int main()
             if (!match)
             {
               // Create ICMP Destination Unreachable
-              printf("Network Unreachable packet\n\n");
-
               // Build IP Header
               struct iphdr iphResponse;
               memcpy(&arp_tip, &routerAddress[(j * 54) + 46], 8);
@@ -465,7 +450,7 @@ int main()
               x.saddr = inet_addr(arp_tip);
 
               // Put broadcast and our MAC Addr in the ArpRequest
-              memcpy(arpRequest.arp_tha, ether_aton(arpReceived.arp_sha), 6);
+              memcpy(arpRequest.arp_tha, ether_aton(target_address), 6);
               memcpy(arpRequest.arp_sha, ether_aton(temp_mac), 6);
 
               // Set Destination IP
@@ -517,8 +502,6 @@ int main()
                 if (errno == EWOULDBLOCK)
                 {
                   // Create ICMP Destination Unreachable
-                  printf("Network Unreachable packet\n\n");
-
                   // Build IP Header
                   struct iphdr iphResponse;
                   memcpy(&arp_tip, &routerAddress[(j * 54) + 46], 8);
@@ -620,7 +603,6 @@ int main()
         // if not read IP header
         else
         {
-          printf("IPv4 packet\n");
           memcpy(&iph, &buf[14], sizeof(iph));
           memcpy(&iphResponse, &buf[14], sizeof(iph));
           // check if this is for us
@@ -629,13 +611,10 @@ int main()
           memcpy(temp_addr, &routerAddress[(j * 54) + 46], 8);
 
           if (!strcmp(temp_tip, temp_addr))
-          { // this should be the IP addr of this interface
-            printf("ICMP packet for us\n");
+          {
             // if ICMP, respond
             if (iph.protocol == 1)
             {
-              printf("ICMP\n\n");
-
               // build IP portion
               memcpy(&iphResponse.saddr, &iph.daddr, sizeof(iph.daddr));
               memcpy(&iphResponse.daddr, &iph.saddr, sizeof(iph.saddr));
@@ -675,16 +654,13 @@ int main()
             }
             else
             {
-              // packet is for us, not ICMP so ignore
               continue;
             }
           }
           else
           {
-            printf("ICMP for someone else\n");
             if (iph.ttl == 1)
             {
-              printf("TTL Exceeded\n\n");
               // Create ICMP Destination Unreachable
               iphResponse = iph;
 
@@ -764,10 +740,8 @@ int main()
               strcpy(device_name, "r2");
             }
             strcat(&device_name[2], fileName);
-            printf("file name: %s\n", device_name);
             FILE *file;
             file = fopen(device_name, "r+");
-            printf("file open\n");
 
             // if the file is Null return the error message and exit
             if (file == NULL)
@@ -782,12 +756,6 @@ int main()
               fileCounter += 23;
             } while (!feof(file));
 
-            // printf("file contents 1\n%s\n", routingTable);
-            // printf("file contents 2\n%s\n", &routingTable[23]);
-            // printf("file contents 3\n%s\n", &routingTable[46]);
-            // printf("file contents 4\n%s\n", &routingTable[69]);
-            // printf("file contents 5\n%s\n", &routingTable[92]);
-
             // Iterate through routing table for a matching IP
             int socketCounter = 0;
             bool match, another_router = false;
@@ -800,12 +768,10 @@ int main()
               strcpy(&temp_ip[7], "0");
               strcat(&temp_tip[8], nul_char);
               strcat(&temp_ip[8], nul_char);
-              printf("temp ip and temp tip: %s, %s\n", temp_ip, temp_tip);
               // Match found
               if (!strncmp(temp_ip, temp_tip, 6))
               {
                 x.daddr = iph.daddr;
-                printf("Yo.\n");
                 match = true;
                 break;
               }
@@ -817,10 +783,8 @@ int main()
             // Case where match is another router
             if (strstr(device_name, "r1"))
             {
-              printf("Device name match\n");
               if (strstr(temp_tip, "10.3.") != NULL)
               {
-                printf("Going to r2\n");
                 memcpy(&not_another_temp, "10.0.0.2", 9);
                 strncpy(not_another_temp, toip(not_another_temp), 20);
                 x.daddr = inet_addr(not_another_temp);
@@ -855,8 +819,6 @@ int main()
             if (!match)
             {
               // Create ICMP Destination Unreachable
-              printf("Network Unreachable packet\n\n");
-
               // Build IP Header
               iphResponse = iph;
               memcpy(&arp_tip, &routerAddress[(j * 54) + 46], 8);
@@ -980,8 +942,6 @@ int main()
                 {
                   // Send ICMP
                   // Create ICMP Destination Unreachable
-                  printf("Host Unreachable packet\n\n");
-
                   // Setup IP Header
                   iphResponse = iph;
                   memcpy(&arp_tip, &routerAddress[(j * 54) + 46], 8);
@@ -1062,10 +1022,13 @@ int main()
       }
       if (FD_ISSET(STDIN_FILENO, &fdstmp))
       {
-        printf("The user typed something, I better do something with it\n");
         char buf[5000];
         fgets(buf, 5000, stdin);
         printf("You typed %s\n", buf);
+        if (!strcmp(buf, "quit"))
+        {
+          exit(45);
+        }
       }
       // what else to do is up to you, you can send packets with send,
       // just like we used for TCP sockets (or you can use sendto, but it
