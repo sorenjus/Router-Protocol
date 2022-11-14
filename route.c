@@ -89,7 +89,7 @@ int main()
   int index = 0;
   // Timeout struct and values for handling timeouts
   struct timeval timeout;
-  timeout.tv_sec = 5;
+  timeout.tv_sec = 1;
   timeout.tv_usec = 0;
   // Broadcast variable
   char broadcast[] = "ff:ff:ff:ff:ff:ff";
@@ -605,6 +605,15 @@ int main()
         {
           memcpy(&iph, &buf[14], sizeof(iph));
           memcpy(&iphResponse, &buf[14], sizeof(iph));
+
+          // check if it is a loopback
+          inet_ntop(AF_INET, &(iph.daddr), temp_ip, INET_ADDRSTRLEN);
+          memcpy(temp_addr, "127.0.0.1", 8);
+
+          if (!strcmp(temp_ip, temp_addr))
+          {
+            continue;
+          }
           // check if this is for us
           memcpy(temp_ip, &iph.daddr, 8);
           inet_ntop(AF_INET, &(temp_ip), temp_tip, INET_ADDRSTRLEN);
@@ -626,6 +635,12 @@ int main()
 
               // Store all of the ICMP info
               memcpy(&icmp, &buf[34], sizeof(icmp));
+
+              // Dismiss router solicitation
+              if (icmp.type == ntohs(133))
+              {
+                continue;
+              }
 
               // Set type and checksum to zero
               icmp.type = ntohs(0x0000);
@@ -940,7 +955,7 @@ int main()
               {
                 if (errno == EWOULDBLOCK)
                 {
-                  // Send ICMP
+                  // Host Unreachable
                   // Create ICMP Destination Unreachable
                   // Setup IP Header
                   iphResponse = iph;
